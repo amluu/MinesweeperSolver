@@ -1,0 +1,3 @@
+__pycache__/
+*.pyc
+minesweeper_solver.log
