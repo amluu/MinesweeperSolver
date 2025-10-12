@@ -24,6 +24,11 @@ class MinesweeperSolver:
         # Merge OCR board with internal state (flags come from state manager)
         merged_board = self.state_manager.merge_with_ocr_board(ocr_board)
         
+        # Debug: Check if flags are properly merged
+        flagged_count = sum(1 for content in merged_board.values() if content == 'flag')
+        state_manager_flags = len(self.state_manager.get_flagged_cells())
+        self.logger.info(f"After merge: {flagged_count} cells marked as 'flag' in merged board, {state_manager_flags} flags in state manager")
+        
         # First pass: identify mines where we're certain
         mine_cells = self._identify_mines(merged_board)
         
@@ -81,6 +86,8 @@ class MinesweeperSolver:
                             self.logger.debug(f"Cell ({unopened[0]}, {unopened[1]}) already flagged, skipping")
         
         self.logger.info(f"Total mines identified: {len(mine_cells)}")
+        if mine_cells:
+            self.logger.info(f"Mine cells to flag: {list(mine_cells)}")
         return list(mine_cells)
     
     def _find_safe_moves_from_board(self, board: Dict[Tuple[int, int], str]) -> List[Tuple[int, int]]:
@@ -147,6 +154,8 @@ class MinesweeperSolver:
                             self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already flagged, skipping safe move")
         
         self.logger.info(f"Total safe moves identified: {len(safe_moves)}")
+        if safe_moves:
+            self.logger.info(f"Safe moves to click: {list(safe_moves)}")
         return list(safe_moves)
     
     def _flag_mines(self, board: Dict[Tuple[int, int], str]) -> None:
@@ -187,11 +196,11 @@ class MinesweeperSolver:
         return len(safe_moves) > 0 or len(mine_cells) > 0
     
     def get_board_statistics(self, board: Dict[Tuple[int, int], str]) -> Dict[str, int]:
-        """Get statistics about the current board state."""
+        """Get statistics about the current board state using state manager data."""
         stats = {
-            'total_cells': len(board),
+            'total_cells': self.grid_rows * self.grid_cols,
             'unopened': 0,
-            'flagged': 0,
+            'flagged': len(self.state_manager.get_flagged_cells()),  # Use state manager
             'revealed_numbers': 0,
             'blank': 0,
             'unknown': 0,
@@ -203,7 +212,8 @@ class MinesweeperSolver:
             if content == 'unopened':
                 stats['unopened'] += 1
             elif content == 'flag':
-                stats['flagged'] += 1
+                # Don't double-count flags (already counted from state manager)
+                pass
             elif content.isdigit():
                 stats['revealed_numbers'] += 1
                 # Count individual numbers
@@ -231,6 +241,12 @@ class MinesweeperSolver:
         self.logger.info(f"Flagged: {stats['flagged']}")
         self.logger.info(f"Unknown: {stats['unknown']}")
         self.logger.info(f"Percent revealed: {stats['percent_revealed']}%")
+        
+        # Log flagged cells for debugging
+        flagged_cells = self.state_manager.get_flagged_cells()
+        if flagged_cells:
+            flagged_list = sorted(list(flagged_cells))
+            self.logger.info(f"Flagged cells: {flagged_list[:10]}{'...' if len(flagged_list) > 10 else ''}")
         
         # Log individual number counts
         number_counts = []

@@ -275,8 +275,47 @@ class UniversalMinesweeperGUI:
                 safe_moves, mine_cells = self.solver.find_safe_moves(board_state)
                 
                 if not safe_moves and not mine_cells:
-                    self._update_status("No safe moves or mines found. Game may be stuck or won.")
-                    break
+                    self._update_status("No safe moves or mines found. Doing final OCR check...")
+                    
+                    # Final OCR check to see if any moves became available
+                    self._update_status("Capturing final board state...")
+                    final_board_image = self.detector.capture_board()
+                    final_board_state = self.detector.analyze_board(final_board_image)
+                    
+                    # Check for moves one more time
+                    final_safe_moves, final_mine_cells = self.solver.find_safe_moves(final_board_state)
+                    
+                    if final_safe_moves or final_mine_cells:
+                        self._update_status(f"Final check found {len(final_safe_moves)} safe moves and {len(final_mine_cells)} mines!")
+                        
+                        # Execute final moves
+                        if final_mine_cells or final_safe_moves:
+                            if final_mine_cells and final_safe_moves:
+                                self._update_status(f"Executing final batch: {len(final_mine_cells)} mines and {len(final_safe_moves)} safe moves...")
+                            elif final_mine_cells:
+                                self._update_status(f"Executing final {len(final_mine_cells)} mine flags...")
+                            else:
+                                self._update_status(f"Executing final {len(final_safe_moves)} safe moves...")
+                            
+                            # Update state manager for final moves
+                            for row, col in final_mine_cells:
+                                self.solver.flag_cell(row, col)
+                            for row, col in final_safe_moves:
+                                self.solver.reveal_cell(row, col)
+                            
+                            # Execute final moves
+                            focus_tab = not tab_focused_this_iteration
+                            self.controller.execute_batch_moves(final_safe_moves, final_mine_cells, focus_tab=focus_tab)
+                            time.sleep(0.3)
+                            
+                            move_count += len(final_safe_moves) + len(final_mine_cells)
+                            self._update_progress(min(20 + (move_count * 0.8), 95))
+                            
+                            # Continue the loop for one more iteration
+                            continue
+                    else:
+                        self._update_status("Final check confirmed: No safe moves or mines found. Game may be stuck or won.")
+                        break
                 
                 # Execute moves efficiently using batch method
                 if mine_cells or safe_moves:

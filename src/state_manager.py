@@ -106,7 +106,9 @@ class MinesweeperStateManager:
                 # Even if OCR sees a number where we have a flag, we keep the flag
                 if self.is_flagged(row, col):
                     merged_board[cell_pos] = 'flag'
-                    self.logger.debug(f"Cell ({row}, {col}): Using internal flag state, ignoring OCR: {ocr_board.get(cell_pos, 'none')}")
+                    # Only log this occasionally to avoid spam
+                    if row < 5 and col < 5:  # Only log first few cells to avoid spam
+                        self.logger.debug(f"Cell ({row}, {col}): Using internal flag state, ignoring OCR: {ocr_board.get(cell_pos, 'none')}")
                     continue
                 
                 # Use OCR for revealed content (numbers, blanks) only for non-flagged cells
