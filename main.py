@@ -2,9 +2,9 @@
 """
 Google Minesweeper Solver - Main Entry Point
 
-A refactored and optimized minesweeper solver with GUI interface.
-Removes hardcoded values, eliminates inefficiencies, and provides
-a clean object-oriented architecture.
+A hardcoded minesweeper solver specifically designed for Google Minesweeper.
+Uses precise pixel coordinates and dimensions for board detection and game control.
+Optimized for Google Chrome at 110% zoom.
 """
 
 import sys
@@ -15,8 +15,7 @@ from pathlib import Path
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.gui import DifficultyGUI
-from src.game_controller import GameController
+from src.gui import UniversalMinesweeperGUI
 
 def setup_logging():
     """Set up logging configuration."""
@@ -32,17 +31,12 @@ def setup_logging():
 def check_dependencies():
     """Check if all required dependencies are available."""
     try:
-        import selenium
-        import cv2
-        import pytesseract
         import configparser
-        from PIL import Image
-        import numpy as np
         return True
     except ImportError as e:
         print(f"Missing dependency: {e}")
         print("Please install required packages:")
-        print("pip install selenium opencv-python pytesseract pillow numpy")
+        print("pip install configparser")
         return False
 
 def verify_structure():
@@ -64,7 +58,7 @@ def verify_structure():
 
 def main():
     """Main entry point for the minesweeper solver."""
-    print("Google Minesweeper Solver v2.0")
+    print("Google Minesweeper Solver v3.0")
     print("=" * 40)
     
     # Check dependencies
@@ -83,10 +77,10 @@ def main():
     
     try:
         # Create and run GUI
-        gui = DifficultyGUI()
+        gui = UniversalMinesweeperGUI()
         
         # Run the GUI (this will block until closed)
-        selected_difficulty = gui.run()
+        gui.run()
         
         logger.info("Application closed")
         
