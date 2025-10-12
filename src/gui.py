@@ -85,9 +85,9 @@ class UniversalMinesweeperGUI:
         
         ttk.Label(difficulty_frame, text="Difficulty:").grid(row=0, column=0, padx=(0, 10))
         
-        self.difficulty_var = tk.StringVar(value="Medium")
+        self.difficulty_var = tk.StringVar(value="medium")
         self.difficulty_combo = ttk.Combobox(difficulty_frame, textvariable=self.difficulty_var,
-                                           values=["Easy", "Medium", "Hard"], state="readonly", width=14)
+                                           values=["easy", "medium", "hard"], state="readonly", width=14)
         self.difficulty_combo.grid(row=0, column=1, padx=(0, 15))
         
         # No Flag Mode checkbox on a new row
