@@ -242,16 +242,18 @@ class UniversalMinesweeperGUI:
             max_moves = 1000  # Safety limit
             previous_board_states = []  # Track previous states to detect loops
             max_state_history = 5  # Keep last 5 states
+            tab_focused_this_iteration = False  # Track if we've focused tab this iteration
             
             while self.is_running and move_count < max_moves:
+                # Reset tab focus tracking for this iteration
+                tab_focused_this_iteration = False
+                
                 # Capture and analyze board
                 self._update_status(f"Capturing board (move {move_count + 1})...")
                 board_image = self.detector.capture_board()
                 board_state = self.detector.analyze_board(board_image)
                 
-                # Save debug image occasionally
-                if move_count % 10 == 0:
-                    self.detector.save_debug_image(board_image, f"debug_board_{move_count}.png")
+                # PNG is now saved automatically with every OCR detection
                 
                 # Log detailed board statistics
                 stats = self.solver.get_board_statistics(board_state)
@@ -292,7 +294,10 @@ class UniversalMinesweeperGUI:
                         self.solver.reveal_cell(row, col)
                     
                     # Execute all moves in one efficient batch
-                    self.controller.execute_batch_moves(safe_moves, mine_cells)
+                    # Only focus tab if we haven't already this iteration
+                    focus_tab = not tab_focused_this_iteration
+                    self.controller.execute_batch_moves(safe_moves, mine_cells, focus_tab=focus_tab)
+                    tab_focused_this_iteration = True  # Mark that we've focused tab this iteration
                     time.sleep(0.3)  # Reduced wait time after batch execution
                     
                     # Re-capture board after moves to ensure state is updated

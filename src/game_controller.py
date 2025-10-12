@@ -177,7 +177,7 @@ class GoogleMinesweeperController:
         else:
             raise ValueError(f"Invalid action: {action}. Use 'reveal' or 'flag'.")
     
-    def execute_batch_moves(self, safe_moves: List[Tuple[int, int]], mine_cells: List[Tuple[int, int]]):
+    def execute_batch_moves(self, safe_moves: List[Tuple[int, int]], mine_cells: List[Tuple[int, int]], focus_tab: bool = True):
         """Execute both safe moves and flagging efficiently in one batch."""
         total_moves = len(safe_moves) + len(mine_cells)
         if total_moves == 0:
@@ -185,8 +185,9 @@ class GoogleMinesweeperController:
             
         self.logger.info(f"Executing batch: {len(safe_moves)} safe moves, {len(mine_cells)} flags")
         
-        # Focus tab only once at the beginning
-        self.select_tab()
+        # Focus tab only if requested (to avoid unnecessary mouse movement)
+        if focus_tab:
+            self.select_tab()
         
         # Pre-calculate all coordinates to avoid redundant calculations
         mine_coords = []

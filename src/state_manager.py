@@ -94,7 +94,7 @@ class MinesweeperStateManager:
         """
         Merge OCR-detected board with internal state.
         OCR is only used for numbers, blanks, and unopened detection.
-        Flags are always taken from internal state.
+        Flags are ALWAYS taken from internal state, never from OCR.
         """
         merged_board = {}
         
@@ -102,12 +102,18 @@ class MinesweeperStateManager:
             for col in range(self.cols):
                 cell_pos = (row, col)
                 
-                # Internal flag state takes precedence
+                # CRITICAL: Internal flag state ALWAYS takes precedence over OCR
+                # Even if OCR sees a number where we have a flag, we keep the flag
                 if self.is_flagged(row, col):
                     merged_board[cell_pos] = 'flag'
-                # Use OCR for revealed content (numbers, blanks)
-                elif cell_pos in ocr_board:
+                    self.logger.debug(f"Cell ({row}, {col}): Using internal flag state, ignoring OCR: {ocr_board.get(cell_pos, 'none')}")
+                    continue
+                
+                # Use OCR for revealed content (numbers, blanks) only for non-flagged cells
+                if cell_pos in ocr_board:
                     ocr_content = ocr_board[cell_pos]
+                    
+                    # Handle revealed content
                     if ocr_content.isdigit() or ocr_content == 'blank':
                         merged_board[cell_pos] = ocr_content
                         # Update our revealed state
@@ -116,8 +122,8 @@ class MinesweeperStateManager:
                     elif ocr_content == 'unopened':
                         merged_board[cell_pos] = 'unopened'
                     else:
-                        # Fallback to internal state
-                        merged_board[cell_pos] = self.get_cell_state(row, col)
+                        # For any other OCR content on non-flagged cells, use OCR
+                        merged_board[cell_pos] = ocr_content
                 else:
                     # No OCR data, use internal state
                     merged_board[cell_pos] = self.get_cell_state(row, col)

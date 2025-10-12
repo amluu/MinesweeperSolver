@@ -10,8 +10,8 @@ class MinesweeperSolver:
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
         self.logger = logging.getLogger(__name__)
-        # Enable debug logging for this session
-        self.logger.setLevel(logging.DEBUG)
+        # Set to INFO level to reduce excessive debug output
+        self.logger.setLevel(logging.INFO)
         
         # Initialize state manager for tracking flags and revealed cells
         self.state_manager = MinesweeperStateManager(grid_rows, grid_cols)
@@ -65,14 +65,16 @@ class MinesweeperSolver:
                 flagged_neighbors = sum(1 for (nr, nc) in neighbors 
                                       if self.state_manager.is_flagged(nr, nc))
                 
-                # Debug logging
-                self.logger.debug(f"Cell ({row}, {col}) has number {number}: {len(unopened_neighbors)} unopened, {flagged_neighbors} flagged")
+                # Only log significant cases
+                if len(unopened_neighbors) + flagged_neighbors == number and len(unopened_neighbors) > 0:
+                    self.logger.debug(f"Cell ({row}, {col}) has number {number}: {len(unopened_neighbors)} unopened, {flagged_neighbors} flagged - MINE CANDIDATES")
                 
                 # If all unopened neighbors must be mines
                 if len(unopened_neighbors) + flagged_neighbors == number:
                     for unopened in unopened_neighbors:
-                        # Check if already flagged in state manager
-                        if not self.state_manager.is_flagged(unopened[0], unopened[1]) and unopened not in mine_cells:
+                        # Double-check: ensure not already flagged AND not already in our set
+                        if (not self.state_manager.is_flagged(unopened[0], unopened[1]) and 
+                            unopened not in mine_cells):
                             mine_cells.add(unopened)
                             self.logger.info(f"Identified mine at ({unopened[0]}, {unopened[1]}) based on cell ({row}, {col}) with number {number}")
                         elif self.state_manager.is_flagged(unopened[0], unopened[1]):
@@ -98,17 +100,21 @@ class MinesweeperSolver:
                 flagged_neighbors = sum(1 for (nr, nc) in neighbors 
                                       if self.state_manager.is_flagged(nr, nc))
                 
-                # Debug logging for safe moves
-                self.logger.debug(f"Checking safe moves for cell ({row}, {col}) with number {number}: {len(unopened_neighbors)} unopened, {flagged_neighbors} flagged")
+                # Only log significant safe move cases
+                if flagged_neighbors == number and len(unopened_neighbors) > 0:
+                    self.logger.debug(f"Cell ({row}, {col}) has number {number}: {len(unopened_neighbors)} unopened, {flagged_neighbors} flagged - SAFE MOVE CANDIDATES")
                 
                 # Case 1: All mines are already flagged, remaining neighbors are safe
                 if flagged_neighbors == number:
                     for neighbor in unopened_neighbors:
                         current_state = board.get(neighbor)
-                        if current_state == 'unopened' and neighbor not in safe_moves:
+                        # Ensure it's truly unopened and not flagged in our state manager
+                        if (current_state == 'unopened' and 
+                            not self.state_manager.is_flagged(neighbor[0], neighbor[1]) and
+                            neighbor not in safe_moves):
                             safe_moves.add(neighbor)
                             self.logger.info(f"Identified safe move at ({neighbor[0]}, {neighbor[1]}) - all mines flagged for cell ({row}, {col}) with number {number}")
-                        elif current_state == 'flag':
+                        elif self.state_manager.is_flagged(neighbor[0], neighbor[1]):
                             self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already flagged, skipping safe move")
         
         # Second pass: Find safe moves using constraint satisfaction
@@ -131,10 +137,13 @@ class MinesweeperSolver:
                     # All unopened neighbors must be safe
                     for neighbor in unopened_neighbors:
                         current_state = board.get(neighbor)
-                        if current_state == 'unopened' and neighbor not in safe_moves:
+                        # Ensure it's truly unopened and not flagged in our state manager
+                        if (current_state == 'unopened' and 
+                            not self.state_manager.is_flagged(neighbor[0], neighbor[1]) and
+                            neighbor not in safe_moves):
                             safe_moves.add(neighbor)
                             self.logger.info(f"Identified safe move at ({neighbor[0]}, {neighbor[1]}) - no mines needed for cell ({row}, {col}) with number {number}")
-                        elif current_state == 'flag':
+                        elif self.state_manager.is_flagged(neighbor[0], neighbor[1]):
                             self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already flagged, skipping safe move")
         
         self.logger.info(f"Total safe moves identified: {len(safe_moves)}")

@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 import mss
 import cv2
+import time
 
 class GoogleMinesweeperDetector:
     """Board detector for Google Minesweeper using hardcoded coordinates."""
@@ -90,6 +91,11 @@ class GoogleMinesweeperDetector:
                 # Analyze cell content
                 cell_state = self._analyze_cell(cell_region)
                 board_state[(row, col)] = cell_state
+        
+        # Save PNG with unique timestamp for debugging
+        timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
+        debug_filename = f"ocr_board_{timestamp}.png"
+        self.save_debug_image(image, debug_filename)
         
         # Debug: Print the board state as a grid
         self.logger.info("=== OCR DETECTED BOARD STATE ===")
