@@ -118,8 +118,11 @@ class DifficultyGUI:
             # Import here to avoid circular imports
             from .game_controller import GameController
             
-            # Create and run game controller
-            controller = GameController(difficulty)
+            # Create and run game controller with status callback
+            controller = GameController(difficulty, self._update_status)
+            
+            self.status_var.set(f"Navigating to game...")
+            self.progress_var.set(30)
             
             self.status_var.set(f"Running {difficulty} solver...")
             self.progress_var.set(50)
@@ -184,6 +187,12 @@ class DifficultyGUI:
     def update_status(self, message: str):
         """Update the status label."""
         self.status_var.set(message)
+    
+    def _update_status(self, message: str):
+        """Internal method to update status from background thread."""
+        # This method is called from the game controller thread
+        # Use root.after to safely update GUI from background thread
+        self.root.after(0, lambda: self.update_status(message))
     
     def update_progress(self, value: float):
         """Update the progress bar (0-100)."""

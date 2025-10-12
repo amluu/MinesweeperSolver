@@ -9,6 +9,7 @@ A refactored and optimized minesweeper solver with GUI interface, built with obj
 - **Modular Architecture**: Clean separation of concerns with dedicated classes
 - **Configurable**: All settings stored in `config.ini` file
 - **Better Error Handling**: Comprehensive logging and error management
+- **CAPTCHA Handling**: Automatic detection and human-assisted completion
 
 ## Installation
 
@@ -68,6 +69,7 @@ Edit `config.ini` to customize:
 - Tesseract OCR path
 - Grid dimensions for each difficulty
 - Screen coordinates for board detection
+- CAPTCHA timeout settings (default: 5 minutes)
 
 ## Improvements from v1.0
 
@@ -79,6 +81,8 @@ Edit `config.ini` to customize:
 - ✅ Optimized coordinate calculations
 - ✅ Added configuration file for easy customization
 - ✅ Improved code maintainability and readability
+- ✅ Added automatic CAPTCHA detection and human-assisted completion
+- ✅ Robust element detection with multiple selector fallbacks
 
 ## Troubleshooting
 
@@ -86,6 +90,7 @@ Edit `config.ini` to customize:
 2. **"Browser won't open"**: Ensure Chrome is installed and accessible
 3. **"Incorrect board detection"**: Verify screen coordinates in `config.ini`
 4. **"Game not starting"**: Check internet connection and Google Minesweeper accessibility
+5. **"CAPTCHA appears"**: Complete the captcha manually in the browser window - the solver will wait automatically
 
 ## Logging
 
