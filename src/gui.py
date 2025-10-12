@@ -291,7 +291,8 @@ class UniversalMinesweeperGUI:
                                 self.controller.execute_batch_moves(final_safe_moves, final_flags_to_execute, focus_tab=focus_tab)
                                 time.sleep(0.3)
                             
-                            move_count += len(final_safe_moves) + len(final_mine_cells)
+                            # Only count moves that were actually executed
+                            move_count += len(final_safe_moves) + len(final_flags_to_execute)
                             self._update_progress(min(20 + (move_count * 0.8), 95))
                             
                             # Continue the loop for one more iteration
@@ -338,7 +339,8 @@ class UniversalMinesweeperGUI:
                 else:
                     self._update_status("No safe moves or mines found this iteration.")
                 
-                move_count += len(safe_moves) + len(mine_cells)
+                # Only count moves that were actually executed
+                move_count += len(safe_moves) + len(flags_to_execute)
                 self._update_progress(min(20 + (move_count * 0.8), 95))
                 
                 # Reduced delay between moves for faster execution
