@@ -213,16 +213,19 @@ class UniversalMinesweeperGUI:
             if self.detector.is_board_fresh(board_state):
                 self._update_status("Fresh board detected. Starting new game...")
                 
+                # Reset state manager for new game
+                self.solver.reset_state()
+                
                 # Start a completely new game by clicking the smiley face
                 self.controller.start_new_game()
-                time.sleep(1)  # Wait for new game to start
+                time.sleep(0.5)  # Reduced wait for new game to start
                 
                 # Now make the initial center click to begin the game
                 self._update_status("Making initial center click...")
                 rows, cols = self.detector.get_board_dimensions()
                 center_row, center_col = rows // 2, cols // 2
                 self.controller.click_cell(center_row, center_col)
-                time.sleep(1)  # Wait for board to update
+                time.sleep(0.5)  # Reduced wait for board to update
                 
                 # Re-capture board after initial click
                 self._update_status("Re-capturing board after initial click...")
@@ -237,6 +240,8 @@ class UniversalMinesweeperGUI:
             # Main solving loop
             move_count = 0
             max_moves = 1000  # Safety limit
+            previous_board_states = []  # Track previous states to detect loops
+            max_state_history = 5  # Keep last 5 states
             
             while self.is_running and move_count < max_moves:
                 # Capture and analyze board
@@ -252,6 +257,18 @@ class UniversalMinesweeperGUI:
                 stats = self.solver.get_board_statistics(board_state)
                 self.solver.log_board_statistics(stats, move_count + 1)
                 
+                # Check for loops by comparing with previous states
+                board_state_key = tuple(sorted(board_state.items()))
+                if board_state_key in previous_board_states:
+                    self._update_status("Detected loop in board state. Stopping to prevent infinite loop.")
+                    self.logger.warning("Loop detected in board state - stopping solver")
+                    break
+                
+                # Update state history
+                previous_board_states.append(board_state_key)
+                if len(previous_board_states) > max_state_history:
+                    previous_board_states.pop(0)
+                
                 # Find safe moves and mines to flag
                 safe_moves, mine_cells = self.solver.find_safe_moves(board_state)
                 
@@ -259,24 +276,37 @@ class UniversalMinesweeperGUI:
                     self._update_status("No safe moves or mines found. Game may be stuck or won.")
                     break
                 
-                # Execute flagging first (if any mines identified)
-                if mine_cells:
-                    self._update_status(f"Found {len(mine_cells)} mines to flag. Flagging...")
-                    self.controller.flag_mines(mine_cells)
-                    time.sleep(0.5)  # Wait for flags to be placed
-                
-                # Execute safe moves (if any)
-                if safe_moves:
-                    self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
-                    self.controller.click_safe_cells(safe_moves)
+                # Execute moves efficiently using batch method
+                if mine_cells or safe_moves:
+                    if mine_cells and safe_moves:
+                        self._update_status(f"Found {len(mine_cells)} mines and {len(safe_moves)} safe moves. Executing batch...")
+                    elif mine_cells:
+                        self._update_status(f"Found {len(mine_cells)} mines to flag. Flagging...")
+                    else:
+                        self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
+                    
+                    # Update state manager for all moves
+                    for row, col in mine_cells:
+                        self.solver.flag_cell(row, col)
+                    for row, col in safe_moves:
+                        self.solver.reveal_cell(row, col)
+                    
+                    # Execute all moves in one efficient batch
+                    self.controller.execute_batch_moves(safe_moves, mine_cells)
+                    time.sleep(0.3)  # Reduced wait time after batch execution
+                    
+                    # Re-capture board after moves to ensure state is updated
+                    self._update_status("Re-capturing board after moves...")
+                    board_image = self.detector.capture_board()
+                    board_state = self.detector.analyze_board(board_image)
                 else:
-                    self._update_status("No safe moves found this iteration.")
+                    self._update_status("No safe moves or mines found this iteration.")
                 
                 move_count += len(safe_moves) + len(mine_cells)
                 self._update_progress(min(20 + (move_count * 0.8), 95))
                 
-                # Small delay between moves
-                time.sleep(0.5)
+                # Reduced delay between moves for faster execution
+                time.sleep(0.1)
                 
                 # Check for win condition (no unopened cells left AND some revealed content)
                 stats = self.solver.get_board_statistics(board_state)

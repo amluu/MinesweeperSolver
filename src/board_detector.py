@@ -127,9 +127,7 @@ class GoogleMinesweeperDetector:
         # Convert to HSV for better color detection
         hsv = cv2.cvtColor(center_region, cv2.COLOR_RGB2HSV)
         
-        # Check for flag first (red color)
-        if self._has_flag(center_region):
-            return 'flag'
+        # NOTE: Flag detection removed - flags are now tracked internally
         
         # Detect numbers 1-8 by their distinct colors (PRIORITY: check before blank cells)
         number = self._detect_number_by_color(hsv)
@@ -147,26 +145,7 @@ class GoogleMinesweeperDetector:
         # Default to unopened if uncertain
         return 'unopened'
     
-    def _has_flag(self, cell_region: np.ndarray) -> bool:
-        """Check if cell contains a flag."""
-        # Convert to HSV for better color detection
-        hsv = cv2.cvtColor(cell_region, cv2.COLOR_RGB2HSV)
-        
-        # Flag: RGB(242, 54, 7) -> HSV(12, 97, 95)
-        # Need to distinguish from number 3 which is darker red: RGB(211, 48, 47)
-        # Flag is brighter and more orange-red
-        lower_flag = np.array([5, 200, 200])   # Bright orange-red flag
-        upper_flag = np.array([20, 255, 255])  # Very bright red
-        
-        # Create mask for flag pixels
-        mask = cv2.inRange(hsv, lower_flag, upper_flag)
-        
-        # Count flag pixels
-        flag_pixels = cv2.countNonZero(mask)
-        
-        # Flag if significant bright red pixels present
-        # Higher threshold to avoid confusion with number 3
-        return flag_pixels > (cell_region.shape[0] * cell_region.shape[1] * 0.2)
+    # Flag detection methods removed - flags are now tracked internally
     
     def _detect_number_by_color(self, hsv_region: np.ndarray) -> Optional[int]:
         """Detect number 1-8 by their distinct colors in HSV."""
@@ -177,8 +156,8 @@ class GoogleMinesweeperDetector:
             1: ([105, 140, 150], [115, 255, 255]),  # Blue: RGB(56, 116, 203) -> HSV(212, 72, 80)
             2: ([36, 108, 120], [76, 148, 160]),    # Green: RGB(80, 140, 70) -> HSV(56, 128, 140)
             3: ([0, 161, 174], [22, 201, 214]),     # Red: RGB(194, 63, 56) -> HSV(2, 181, 194)
-            4: ([140, 150, 60], [160, 255, 180]),   # Purple: RGB(123, 32, 162) -> HSV(283, 80, 64)
-            5: ([20, 150, 150], [40, 255, 255]),    # Orange: RGB(255, 143, 0) -> HSV(33, 100, 100)
+            4: ([119, 171, 136], [159, 211, 176]),  # Purple: RGB(113, 39, 156) -> HSV(139, 191, 156)
+            5: ([0, 178, 220], [35, 218, 255]),     # Orange: RGB(240, 149, 54) -> HSV(15, 198, 240)
             6: ([90, 150, 100], [110, 255, 220]),   # Cyan: RGB(0, 151, 167) -> HSV(184, 100, 65)
             7: ([0, 0, 20], [180, 50, 100]),        # Dark gray: RGB(66, 66, 66) -> HSV(0, 0, 26)
             8: ([0, 0, 80], [180, 80, 200])         # Light gray: RGB(156, 158, 159) -> HSV(0, 2, 62)
@@ -197,8 +176,8 @@ class GoogleMinesweeperDetector:
             # Count matching pixels
             count = cv2.countNonZero(mask)
             
-            # Debug logging for numbers 2 and 3
-            if number in [2, 3]:  # Log all detection attempts for 2 and 3
+            # Debug logging for numbers 2, 3, 4, and 5
+            if number in [2, 3, 4, 5]:  # Log all detection attempts for problematic numbers
                 self.logger.debug(f"Number {number}: {count} pixels (threshold: {threshold}) - {'MATCH' if count > threshold else 'below threshold'}")
             
             if count > best_count and count > threshold:

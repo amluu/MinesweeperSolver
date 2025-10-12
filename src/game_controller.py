@@ -14,9 +14,9 @@ class GoogleMinesweeperController:
         self.logger = logging.getLogger(__name__)
         self.detector = None
         
-        # Configure pyautogui
+        # Configure pyautogui for faster execution
         pyautogui.FAILSAFE = True  # Move mouse to corner to stop
-        pyautogui.PAUSE = 0.1  # Small pause between actions
+        pyautogui.PAUSE = 0.01  # Minimal pause between actions for speed
         
     def set_detector(self, detector):
         """Set the board detector for coordinate calculation."""
@@ -35,9 +35,9 @@ class GoogleMinesweeperController:
         center_x = board_config['x'] + (board_config['width'] // 2)
         center_y = board_config['y'] + (board_config['height'] // 2)
         
-        self.logger.info(f"Selecting Minesweeper tab by clicking board center at ({center_x}, {center_y})")
+        self.logger.debug(f"Selecting Minesweeper tab by clicking board center at ({center_x}, {center_y})")
         pyautogui.click(center_x, center_y)
-        time.sleep(0.3)  # Brief wait for focus
+        time.sleep(0.1)  # Reduced wait for focus
     
     def set_difficulty(self, difficulty: str):
         """Set the game difficulty by clicking the dropdown."""
@@ -60,7 +60,7 @@ class GoogleMinesweeperController:
         
         # Click dropdown to open it
         pyautogui.click(dropdown_x, dropdown_y)
-        time.sleep(0.5)  # Wait for dropdown to open
+        time.sleep(0.3)  # Reduced wait for dropdown to open
         
         # Click appropriate difficulty option
         if difficulty == 'easy':
@@ -74,68 +74,99 @@ class GoogleMinesweeperController:
             pyautogui.click(hard_x, hard_y)
             self.logger.info("Selected Hard difficulty")
         
-        time.sleep(1.0)  # Wait for game to load
+        time.sleep(0.5)  # Reduced wait for game to load
     
-    def click_cell(self, row: int, col: int, button: str = 'left'):
+    def click_cell(self, row: int, col: int, button: str = 'left', focus_tab: bool = True):
         """Click a specific cell on the board."""
         if not self.detector:
             raise RuntimeError("Detector not set. Call set_detector() first.")
         
-        # Focus the Minesweeper tab first
-        self.select_tab()
+        # Only focus tab if explicitly requested (for batching)
+        if focus_tab:
+            self.select_tab()
         
         # Get cell coordinates from detector
         x, y = self.detector.get_cell_coordinates(row, col)
         
         # Debug logging
-        self.logger.info(f"Clicking cell ({row}, {col}) at coordinates ({x}, {y})")
+        self.logger.debug(f"Clicking cell ({row}, {col}) at coordinates ({x}, {y})")
         
         # Get current screen size for validation
         screen_width, screen_height = pyautogui.size()
-        self.logger.info(f"Screen size: {screen_width}x{screen_height}")
         
         # Validate coordinates are within screen bounds
         if x < 0 or x >= screen_width or y < 0 or y >= screen_height:
             self.logger.error(f"Coordinates ({x}, {y}) are outside screen bounds!")
             return
         
-        # Move mouse to coordinates and click
-        pyautogui.moveTo(x, y, duration=0.5)
-        time.sleep(0.2)
+        # Move mouse to coordinates quickly and click
+        pyautogui.moveTo(x, y, duration=0.1)  # Much faster movement
         
         # Click the cell
         if button == 'left':
             pyautogui.click(x, y)
-            self.logger.info(f"Left clicked cell ({row}, {col}) at ({x}, {y})")
+            self.logger.debug(f"Left clicked cell ({row}, {col}) at ({x}, {y})")
         elif button == 'right':
             pyautogui.rightClick(x, y)
-            self.logger.info(f"Right clicked cell ({row}, {col}) at ({x}, {y})")
+            self.logger.debug(f"Right clicked cell ({row}, {col}) at ({x}, {y})")
         else:
             raise ValueError(f"Invalid button: {button}. Use 'left' or 'right'.")
-        
-        time.sleep(0.1)  # Small delay between clicks
     
     def click_safe_cells(self, safe_cells: List[Tuple[int, int]]):
-        """Click multiple safe cells."""
+        """Click multiple safe cells efficiently."""
+        if not safe_cells:
+            return
+            
         self.logger.info(f"Clicking {len(safe_cells)} safe cells")
         
+        # Focus tab only once at the beginning
+        self.select_tab()
+        
+        # Pre-calculate all coordinates
+        coords = []
         for row, col in safe_cells:
             try:
-                self.click_cell(row, col, 'left')
-                time.sleep(0.1)  # Small delay between clicks
+                x, y = self.detector.get_cell_coordinates(row, col)
+                coords.append((x, y))
             except Exception as e:
-                self.logger.error(f"Failed to click cell ({row}, {col}): {e}")
+                self.logger.error(f"Failed to get coordinates for cell ({row}, {col}): {e}")
+        
+        # Execute clicks with pre-calculated coordinates
+        for x, y in coords:
+            try:
+                pyautogui.moveTo(x, y, duration=0.05)
+                pyautogui.click(x, y)
+                time.sleep(0.03)
+            except Exception as e:
+                self.logger.error(f"Failed to click at coordinates ({x}, {y}): {e}")
     
     def flag_mines(self, mine_cells: List[Tuple[int, int]]):
-        """Right-click to flag mine cells."""
+        """Right-click to flag mine cells efficiently."""
+        if not mine_cells:
+            return
+            
         self.logger.info(f"Flagging {len(mine_cells)} mine cells")
         
+        # Focus tab only once at the beginning
+        self.select_tab()
+        
+        # Pre-calculate all coordinates
+        coords = []
         for row, col in mine_cells:
             try:
-                self.click_cell(row, col, 'right')
-                time.sleep(0.1)  # Small delay between clicks
+                x, y = self.detector.get_cell_coordinates(row, col)
+                coords.append((x, y))
             except Exception as e:
-                self.logger.error(f"Failed to flag cell ({row}, {col}): {e}")
+                self.logger.error(f"Failed to get coordinates for mine cell ({row}, {col}): {e}")
+        
+        # Execute right-clicks with pre-calculated coordinates
+        for x, y in coords:
+            try:
+                pyautogui.moveTo(x, y, duration=0.05)
+                pyautogui.rightClick(x, y)
+                time.sleep(0.03)
+            except Exception as e:
+                self.logger.error(f"Failed to flag at coordinates ({x}, {y}): {e}")
     
     def make_move(self, row: int, col: int, action: str = 'reveal'):
         """Make a move (reveal or flag) on a specific cell using double-click logic."""
@@ -145,6 +176,53 @@ class GoogleMinesweeperController:
             self.click_cell(row, col, 'right')
         else:
             raise ValueError(f"Invalid action: {action}. Use 'reveal' or 'flag'.")
+    
+    def execute_batch_moves(self, safe_moves: List[Tuple[int, int]], mine_cells: List[Tuple[int, int]]):
+        """Execute both safe moves and flagging efficiently in one batch."""
+        total_moves = len(safe_moves) + len(mine_cells)
+        if total_moves == 0:
+            return
+            
+        self.logger.info(f"Executing batch: {len(safe_moves)} safe moves, {len(mine_cells)} flags")
+        
+        # Focus tab only once at the beginning
+        self.select_tab()
+        
+        # Pre-calculate all coordinates to avoid redundant calculations
+        mine_coords = []
+        safe_coords = []
+        
+        for row, col in mine_cells:
+            try:
+                x, y = self.detector.get_cell_coordinates(row, col)
+                mine_coords.append((x, y))
+            except Exception as e:
+                self.logger.error(f"Failed to get coordinates for mine cell ({row}, {col}): {e}")
+        
+        for row, col in safe_moves:
+            try:
+                x, y = self.detector.get_cell_coordinates(row, col)
+                safe_coords.append((x, y))
+            except Exception as e:
+                self.logger.error(f"Failed to get coordinates for safe cell ({row}, {col}): {e}")
+        
+        # Execute flagging first (mines) - direct coordinate clicks
+        for x, y in mine_coords:
+            try:
+                pyautogui.moveTo(x, y, duration=0.05)
+                pyautogui.rightClick(x, y)
+                time.sleep(0.03)
+            except Exception as e:
+                self.logger.error(f"Failed to flag at coordinates ({x}, {y}): {e}")
+        
+        # Then execute safe moves - direct coordinate clicks
+        for x, y in safe_coords:
+            try:
+                pyautogui.moveTo(x, y, duration=0.05)
+                pyautogui.click(x, y)
+                time.sleep(0.03)
+            except Exception as e:
+                self.logger.error(f"Failed to click at coordinates ({x}, {y}): {e}")
     
     def start_new_game(self):
         """Start a new game by clicking the smiley face."""
@@ -163,7 +241,7 @@ class GoogleMinesweeperController:
         self.logger.info(f"Clicking smiley face at ({smiley_x}, {smiley_y}) to start new game")
         pyautogui.click(smiley_x, smiley_y)
         self.logger.info("Clicked smiley face to start new game")
-        time.sleep(1.0)  # Wait for new game to start
+        time.sleep(0.5)  # Reduced wait for new game to start
     
     def get_mouse_position(self) -> Tuple[int, int]:
         """Get current mouse position for debugging."""
