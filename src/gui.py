@@ -4,6 +4,11 @@ import threading
 import logging
 import time
 from typing import Optional, Callable
+try:
+    import keyboard  # For global hotkeys
+    KEYBOARD_AVAILABLE = True
+except ImportError:
+    KEYBOARD_AVAILABLE = False
 from .board_detector import GoogleMinesweeperDetector
 from .game_controller import GoogleMinesweeperController
 from .solver import MinesweeperSolver
@@ -31,8 +36,25 @@ class UniversalMinesweeperGUI:
     def _setup_gui(self):
         """Set up the GUI components."""
         self.root.title("Google Minesweeper Solver")
-        self.root.geometry("500x400")
+        self.root.geometry("300x475")
         self.root.resizable(False, False)
+        self.root.attributes('-topmost', True)  # Keep window on top
+        
+        # Bind ESC key to stop solver (works when GUI has focus)
+        self.root.bind('<Escape>', lambda e: self._stop_solver())
+        
+        # Set up global ESC hotkey if keyboard module is available
+        if KEYBOARD_AVAILABLE:
+            try:
+                keyboard.add_hotkey('esc', self._stop_solver)
+                self.global_hotkey_enabled = True
+                self.logger.info("Global ESC hotkey enabled")
+            except Exception as e:
+                self.logger.warning(f"Could not set global ESC hotkey: {e}")
+                self.global_hotkey_enabled = False
+        else:
+            self.global_hotkey_enabled = False
+            self.logger.info("Keyboard module not available - using local ESC binding only")
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="20")
@@ -43,38 +65,46 @@ class UniversalMinesweeperGUI:
                                font=("Arial", 16, "bold"))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
-        # Difficulty selection frame
-        difficulty_frame = ttk.LabelFrame(main_frame, text="Difficulty Selection", padding="10")
-        difficulty_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
+        # Status frame (moved to top)
+        status_frame = ttk.LabelFrame(main_frame, text="Status", padding="10")
+        status_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
+        
+        self.status_var = tk.StringVar(value="Select difficulty and start solver")
+        self.status_label = ttk.Label(status_frame, textvariable=self.status_var, wraplength=250)
+        self.status_label.grid(row=0, column=0, sticky=tk.W)
+        
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, 
+                                          maximum=100, length=230)
+        self.progress_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        
+        # Game Settings frame (moved to middle)
+        difficulty_frame = ttk.LabelFrame(main_frame, text="Game Settings", padding="10")
+        difficulty_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         
         ttk.Label(difficulty_frame, text="Difficulty:").grid(row=0, column=0, padx=(0, 10))
         
-        self.difficulty_var = tk.StringVar(value="medium")
+        self.difficulty_var = tk.StringVar(value="Medium")
         self.difficulty_combo = ttk.Combobox(difficulty_frame, textvariable=self.difficulty_var,
-                                           values=["easy", "medium", "hard"], state="readonly")
-        self.difficulty_combo.grid(row=0, column=1, padx=(0, 10))
+                                           values=["Easy", "Medium", "Hard"], state="readonly", width=14)
+        self.difficulty_combo.grid(row=0, column=1, padx=(0, 15))
         
-        self.set_difficulty_btn = ttk.Button(difficulty_frame, text="Set Difficulty", 
-                                           command=self._set_difficulty)
-        self.set_difficulty_btn.grid(row=0, column=2, padx=(0, 10))
-        
-        self.test_coords_btn = ttk.Button(difficulty_frame, text="Test Coordinates", 
-                                        command=self._test_coordinates)
-        self.test_coords_btn.grid(row=0, column=3, padx=(0, 10))
-        
-        self.get_mouse_btn = ttk.Button(difficulty_frame, text="Get Mouse Pos", 
-                                      command=self._get_mouse_position)
-        self.get_mouse_btn.grid(row=0, column=4)
+        # No Flag Mode checkbox on a new row
+        self.no_flag_mode = tk.BooleanVar(value=False)
+        self.no_flag_checkbox = ttk.Checkbutton(difficulty_frame, text="No Flag Mode", 
+                                               variable=self.no_flag_mode)
+        self.no_flag_checkbox.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(10, 0))
         
         # Instructions
         instructions = ttk.Label(main_frame, 
-                                text="Select difficulty and start solver. Make sure Google Minesweeper is open at 110% zoom!",
+                                text="Make sure Google Minesweeper is open \nand stays on screen!",
                                 justify=tk.LEFT)
-        instructions.grid(row=2, column=0, columnspan=3, pady=(0, 20))
+        instructions.grid(row=3, column=0, columnspan=3, pady=(0, 20))
         
-        # Control buttons frame
+        # Control buttons frame (moved to bottom)
         control_frame = ttk.LabelFrame(main_frame, text="Solver Control", padding="10")
-        control_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
+        control_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         
         self.start_btn = ttk.Button(control_frame, text="Start Solver", 
                                    command=self._start_solver)
@@ -84,19 +114,14 @@ class UniversalMinesweeperGUI:
                                   command=self._stop_solver, state="disabled")
         self.stop_btn.grid(row=0, column=1)
         
-        # Status frame
-        status_frame = ttk.LabelFrame(main_frame, text="Status", padding="10")
-        status_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E))
+        # Stop instructions
+        if self.global_hotkey_enabled:
+            esc_text = "Press ESC to stop the solver (works anywhere)."
+        else:
+            esc_text = "Select this window and press ESC to stop."
         
-        self.status_var = tk.StringVar(value="Ready - Select difficulty and start solver")
-        self.status_label = ttk.Label(status_frame, textvariable=self.status_var, wraplength=450)
-        self.status_label.grid(row=0, column=0, sticky=tk.W)
-        
-        # Progress bar
-        self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, 
-                                          maximum=100, length=400)
-        self.progress_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
+        stop_instructions = ttk.Label(main_frame, text=esc_text, justify=tk.LEFT)
+        stop_instructions.grid(row=5, column=0, columnspan=3, pady=(0, 0))
         
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
@@ -104,8 +129,15 @@ class UniversalMinesweeperGUI:
         main_frame.columnconfigure(0, weight=1)
         status_frame.columnconfigure(0, weight=1)
     
-    def _set_difficulty(self):
-        """Set the game difficulty."""
+    
+    def _start_solver(self):
+        """Start the solver in a separate thread."""
+        if self.is_running:
+            messagebox.showwarning("Already Running", 
+                                 "The solver is already running.")
+            return
+        
+        # Initialize difficulty and solver automatically
         try:
             difficulty = self.difficulty_var.get()
             
@@ -119,71 +151,12 @@ class UniversalMinesweeperGUI:
             rows, cols = self.detector.get_board_dimensions()
             self.solver = MinesweeperSolver(rows, cols)
             
-            self.status_var.set(f"Difficulty set to {difficulty.title()} ({rows}x{cols} grid)")
-            messagebox.showinfo("Success", f"Difficulty set to {difficulty.title()}")
+            self.status_var.set(f"Initialized {difficulty.title()} ({rows}x{cols} grid)")
             
         except Exception as e:
-            error_msg = f"Failed to set difficulty: {str(e)}"
+            error_msg = f"Failed to initialize difficulty: {str(e)}"
             self.logger.error(error_msg)
             messagebox.showerror("Error", error_msg)
-    
-    def _test_coordinates(self):
-        """Test coordinate system by moving mouse to board positions."""
-        try:
-            if not self.solver:
-                messagebox.showwarning("No Difficulty Set", 
-                                     "Please set difficulty first.")
-                return
-            
-            self.status_var.set("Testing coordinates... Watch your mouse!")
-            messagebox.showinfo("Coordinate Test", 
-                              "Watch your mouse move to test coordinates. This will take about 30 seconds.")
-            
-            # Run test in a separate thread
-            test_thread = threading.Thread(target=self._run_coordinate_test)
-            test_thread.daemon = True
-            test_thread.start()
-            
-        except Exception as e:
-            error_msg = f"Failed to test coordinates: {str(e)}"
-            self.logger.error(error_msg)
-            messagebox.showerror("Error", error_msg)
-    
-    def _run_coordinate_test(self):
-        """Run coordinate test in background thread."""
-        try:
-            self.controller.test_coordinates()
-            self.root.after(0, lambda: self.status_var.set("Coordinate test completed"))
-            self.root.after(0, lambda: messagebox.showinfo("Test Complete", 
-                                "Coordinate test completed. Check the logs for details."))
-        except Exception as e:
-            error_msg = f"Coordinate test failed: {str(e)}"
-            self.logger.error(error_msg)
-            self.root.after(0, lambda: self.status_var.set("Coordinate test failed"))
-            self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
-    
-    def _get_mouse_position(self):
-        """Get current mouse position for debugging."""
-        try:
-            import pyautogui
-            x, y = pyautogui.position()
-            messagebox.showinfo("Mouse Position", f"Current mouse position: ({x}, {y})")
-            self.logger.info(f"Current mouse position: ({x}, {y})")
-        except Exception as e:
-            error_msg = f"Failed to get mouse position: {str(e)}"
-            self.logger.error(error_msg)
-            messagebox.showerror("Error", error_msg)
-    
-    def _start_solver(self):
-        """Start the solver in a separate thread."""
-        if self.is_running:
-            messagebox.showwarning("Already Running", 
-                                 "The solver is already running.")
-            return
-        
-        if not self.solver:
-            messagebox.showwarning("No Difficulty Set", 
-                                 "Please set difficulty first.")
             return
         
         # Update UI
@@ -228,11 +201,11 @@ class UniversalMinesweeperGUI:
                 time.sleep(0.5)  # Reduced wait for board to update
                 
                 # Re-capture board after initial click
-                self._update_status("Re-capturing board after initial click...")
+                self._update_status("Re-capturing board...")
                 board_image = self.detector.capture_board()
                 board_state = self.detector.analyze_board(board_image)
             else:
-                self._update_status("Board already in progress. Continuing with current state...")
+                self._update_status("Continuing with current state...")
             
             self._update_status("Beginning solving loop...")
             self._update_progress(20)
@@ -262,8 +235,8 @@ class UniversalMinesweeperGUI:
                 # Check for loops by comparing with previous states
                 board_state_key = tuple(sorted(board_state.items()))
                 if board_state_key in previous_board_states:
-                    self._update_status("Detected loop in board state. Stopping to prevent infinite loop.")
-                    self.logger.warning("Loop detected in board state - stopping solver")
+                    self._update_status("Detected loop in board state. Stopping...")
+                    self.logger.warning("Loop detected in board state. Stopping solver...")
                     break
                 
                 # Update state history
@@ -290,23 +263,33 @@ class UniversalMinesweeperGUI:
                         
                         # Execute final moves
                         if final_mine_cells or final_safe_moves:
+                            # Check no-flag mode for final moves
+                            final_flags_to_execute = final_mine_cells if not self.no_flag_mode.get() else []
+                            
                             if final_mine_cells and final_safe_moves:
-                                self._update_status(f"Executing final batch: {len(final_mine_cells)} mines and {len(final_safe_moves)} safe moves...")
+                                if self.no_flag_mode.get():
+                                    self._update_status(f"Executing final safe moves: {len(final_safe_moves)} (mines not flagged due to no-flag mode)")
+                                else:
+                                    self._update_status(f"Executing final batch: {len(final_mine_cells)} mines and {len(final_safe_moves)} safe moves...")
                             elif final_mine_cells:
-                                self._update_status(f"Executing final {len(final_mine_cells)} mine flags...")
+                                if self.no_flag_mode.get():
+                                    self._update_status(f"Found {len(final_mine_cells)} final mines (not flagging due to no-flag mode)")
+                                else:
+                                    self._update_status(f"Executing final {len(final_mine_cells)} mine flags...")
                             else:
                                 self._update_status(f"Executing final {len(final_safe_moves)} safe moves...")
                             
-                            # Update state manager for final moves
+                            # Update state manager for final moves (including flags for internal tracking)
                             for row, col in final_mine_cells:
                                 self.solver.flag_cell(row, col)
                             for row, col in final_safe_moves:
                                 self.solver.reveal_cell(row, col)
                             
-                            # Execute final moves
-                            focus_tab = not tab_focused_this_iteration
-                            self.controller.execute_batch_moves(final_safe_moves, final_mine_cells, focus_tab=focus_tab)
-                            time.sleep(0.3)
+                            # Execute final moves - only safe moves if no-flag mode is on
+                            if final_safe_moves or final_flags_to_execute:
+                                focus_tab = not tab_focused_this_iteration
+                                self.controller.execute_batch_moves(final_safe_moves, final_flags_to_execute, focus_tab=focus_tab)
+                                time.sleep(0.3)
                             
                             move_count += len(final_safe_moves) + len(final_mine_cells)
                             self._update_progress(min(20 + (move_count * 0.8), 95))
@@ -319,25 +302,34 @@ class UniversalMinesweeperGUI:
                 
                 # Execute moves efficiently using batch method
                 if mine_cells or safe_moves:
+                    # Check no-flag mode
+                    flags_to_execute = mine_cells if not self.no_flag_mode.get() else []
+                    
                     if mine_cells and safe_moves:
-                        self._update_status(f"Found {len(mine_cells)} mines and {len(safe_moves)} safe moves. Executing batch...")
+                        if self.no_flag_mode.get():
+                            self._update_status(f"Found {len(mine_cells)} mines (not flagging) and {len(safe_moves)} safe moves. Executing safe moves...")
+                        else:
+                            self._update_status(f"Found {len(mine_cells)} mines and {len(safe_moves)} safe moves. Executing batch...")
                     elif mine_cells:
-                        self._update_status(f"Found {len(mine_cells)} mines to flag. Flagging...")
+                        if self.no_flag_mode.get():
+                            self._update_status(f"Found {len(mine_cells)} mines (not flagging due to no-flag mode)")
+                        else:
+                            self._update_status(f"Found {len(mine_cells)} mines to flag. Flagging...")
                     else:
                         self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
                     
-                    # Update state manager for all moves
+                    # Update state manager for all moves (including flags for internal tracking)
                     for row, col in mine_cells:
                         self.solver.flag_cell(row, col)
                     for row, col in safe_moves:
                         self.solver.reveal_cell(row, col)
                     
-                    # Execute all moves in one efficient batch
-                    # Only focus tab if we haven't already this iteration
-                    focus_tab = not tab_focused_this_iteration
-                    self.controller.execute_batch_moves(safe_moves, mine_cells, focus_tab=focus_tab)
-                    tab_focused_this_iteration = True  # Mark that we've focused tab this iteration
-                    time.sleep(0.3)  # Reduced wait time after batch execution
+                    # Execute moves - only safe moves if no-flag mode is on
+                    if safe_moves or flags_to_execute:
+                        focus_tab = not tab_focused_this_iteration
+                        self.controller.execute_batch_moves(safe_moves, flags_to_execute, focus_tab=focus_tab)
+                        tab_focused_this_iteration = True  # Mark that we've focused tab this iteration
+                        time.sleep(0.3)  # Reduced wait time after batch execution
                     
                     # Re-capture board after moves to ensure state is updated
                     self._update_status("Re-capturing board after moves...")
@@ -432,4 +424,10 @@ class UniversalMinesweeperGUI:
     
     def destroy(self):
         """Destroy the GUI."""
+        # Clean up global hotkey if it was set
+        if hasattr(self, 'global_hotkey_enabled') and self.global_hotkey_enabled and KEYBOARD_AVAILABLE:
+            try:
+                keyboard.unhook_all_hotkeys()
+            except Exception:
+                pass
         self.root.destroy()

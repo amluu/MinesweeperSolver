@@ -40,41 +40,14 @@ class GoogleMinesweeperController:
         time.sleep(0.1)  # Reduced wait for focus
     
     def set_difficulty(self, difficulty: str):
-        """Set the game difficulty by clicking the dropdown."""
+        """Set the game difficulty - user must manually select difficulty."""
         if difficulty not in ['easy', 'medium', 'hard']:
             raise ValueError(f"Invalid difficulty: {difficulty}")
         
-        self.logger.info(f"Setting difficulty to {difficulty}")
+        self.logger.info(f"Difficulty set to {difficulty} - user must manually select this in the game")
         
-        # Medium is the default, no clicking needed
-        if difficulty == 'medium':
-            self.logger.info("Medium is default, no dropdown interaction needed")
-            return
-        
-        # Focus the Minesweeper tab first
-        self.select_tab()
-        
-        # Get dropdown coordinates
-        dropdown_x = self.config.getint('difficulty_selector', 'dropdown_x')
-        dropdown_y = self.config.getint('difficulty_selector', 'dropdown_y')
-        
-        # Click dropdown to open it
-        pyautogui.click(dropdown_x, dropdown_y)
-        time.sleep(0.3)  # Reduced wait for dropdown to open
-        
-        # Click appropriate difficulty option
-        if difficulty == 'easy':
-            easy_x = self.config.getint('difficulty_selector', 'easy_x')
-            easy_y = self.config.getint('difficulty_selector', 'easy_y')
-            pyautogui.click(easy_x, easy_y)
-            self.logger.info("Selected Easy difficulty")
-        elif difficulty == 'hard':
-            hard_x = self.config.getint('difficulty_selector', 'hard_x')
-            hard_y = self.config.getint('difficulty_selector', 'hard_y')
-            pyautogui.click(hard_x, hard_y)
-            self.logger.info("Selected Hard difficulty")
-        
-        time.sleep(0.5)  # Reduced wait for game to load
+        # No longer clicking dropdown - user must select difficulty manually
+        # This ensures the first click is always the center click, not dropdown clicks
     
     def click_cell(self, row: int, col: int, button: str = 'left', focus_tab: bool = True):
         """Click a specific cell on the board."""
