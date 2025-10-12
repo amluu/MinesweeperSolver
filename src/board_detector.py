@@ -38,8 +38,8 @@ class GoogleMinesweeperDetector:
             'y': self.config.getint(section_name, 'board_y'),
             'rows': self.config.getint(section_name, 'grid_rows'),
             'cols': self.config.getint(section_name, 'grid_cols'),
-            'cell_width': self.config.getint(section_name, 'cell_width'),
-            'cell_height': self.config.getint(section_name, 'cell_height')
+            'cell_width': self.config.getfloat(section_name, 'cell_width'),
+            'cell_height': self.config.getfloat(section_name, 'cell_height')
         }
         
         self.logger.info(f"Set difficulty to {difficulty}: {self.board_config['rows']}x{self.board_config['cols']} grid")
@@ -79,13 +79,15 @@ class GoogleMinesweeperDetector:
         for row in range(self.board_config['rows']):
             for col in range(self.board_config['cols']):
                 # Calculate cell position in image
-                cell_x = col * self.board_config['cell_width']
-                cell_y = row * self.board_config['cell_height']
+                cell_x = int(col * self.board_config['cell_width'])
+                cell_y = int(row * self.board_config['cell_height'])
+                cell_width = int(self.board_config['cell_width'])
+                cell_height = int(self.board_config['cell_height'])
                 
                 # Extract cell region
                 cell_region = img_array[
-                    cell_y:cell_y + self.board_config['cell_height'],
-                    cell_x:cell_x + self.board_config['cell_width']
+                    cell_y:cell_y + cell_height,
+                    cell_x:cell_x + cell_width
                 ]
                 
                 # Analyze cell content
@@ -234,8 +236,8 @@ class GoogleMinesweeperDetector:
             raise RuntimeError("Difficulty not set. Call set_difficulty() first.")
         
         # Calculate cell center coordinates
-        cell_x = self.board_config['x'] + (col * self.board_config['cell_width']) + (self.board_config['cell_width'] // 2)
-        cell_y = self.board_config['y'] + (row * self.board_config['cell_height']) + (self.board_config['cell_height'] // 2)
+        cell_x = int(self.board_config['x'] + (col * self.board_config['cell_width']) + (self.board_config['cell_width'] / 2))
+        cell_y = int(self.board_config['y'] + (row * self.board_config['cell_height']) + (self.board_config['cell_height'] / 2))
         
         # Debug logging
         self.logger.info(f"Cell ({row}, {col}) coordinates: board at ({self.board_config['x']}, {self.board_config['y']}), "
