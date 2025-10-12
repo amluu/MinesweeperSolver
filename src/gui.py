@@ -108,8 +108,12 @@ class UniversalMinesweeperGUI:
         """Set the game difficulty."""
         try:
             difficulty = self.difficulty_var.get()
-            self.controller.set_difficulty(difficulty)
+            
+            # Initialize detector first
             self.detector.set_difficulty(difficulty)
+            
+            # Then set controller difficulty (which can now use the initialized detector)
+            self.controller.set_difficulty(difficulty)
             
             # Initialize solver with board dimensions
             rows, cols = self.detector.get_board_dimensions()
@@ -200,11 +204,34 @@ class UniversalMinesweeperGUI:
             self._update_status("Initializing solver...")
             self._update_progress(10)
             
-            # Start new game
-            self.controller.start_new_game()
-            time.sleep(2)  # Wait for game to start
+            # Capture and analyze initial board state
+            self._update_status("Capturing initial board state...")
+            board_image = self.detector.capture_board()
+            board_state = self.detector.analyze_board(board_image)
             
-            self._update_status("Game started. Beginning solving...")
+            # Check if board is fresh and make initial click if needed
+            if self.detector.is_board_fresh(board_state):
+                self._update_status("Fresh board detected. Starting new game...")
+                
+                # Start a completely new game by clicking the smiley face
+                self.controller.start_new_game()
+                time.sleep(1)  # Wait for new game to start
+                
+                # Now make the initial center click to begin the game
+                self._update_status("Making initial center click...")
+                rows, cols = self.detector.get_board_dimensions()
+                center_row, center_col = rows // 2, cols // 2
+                self.controller.click_cell(center_row, center_col)
+                time.sleep(1)  # Wait for board to update
+                
+                # Re-capture board after initial click
+                self._update_status("Re-capturing board after initial click...")
+                board_image = self.detector.capture_board()
+                board_state = self.detector.analyze_board(board_image)
+            else:
+                self._update_status("Board already in progress. Continuing with current state...")
+            
+            self._update_status("Beginning solving loop...")
             self._update_progress(20)
             
             # Main solving loop
@@ -221,27 +248,45 @@ class UniversalMinesweeperGUI:
                 if move_count % 10 == 0:
                     self.detector.save_debug_image(board_image, f"debug_board_{move_count}.png")
                 
-                # Find safe moves
-                safe_moves = self.solver.find_safe_moves(board_state)
+                # Log detailed board statistics
+                stats = self.solver.get_board_statistics(board_state)
+                self.solver.log_board_statistics(stats, move_count + 1)
                 
-                if not safe_moves:
-                    self._update_status("No safe moves found. Game may be stuck or won.")
+                # Find safe moves and mines to flag
+                safe_moves, mine_cells = self.solver.find_safe_moves(board_state)
+                
+                if not safe_moves and not mine_cells:
+                    self._update_status("No safe moves or mines found. Game may be stuck or won.")
                     break
                 
-                # Execute safe moves
-                self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
-                self.controller.click_safe_cells(safe_moves)
+                # Execute flagging first (if any mines identified)
+                if mine_cells:
+                    self._update_status(f"Found {len(mine_cells)} mines to flag. Flagging...")
+                    self.controller.flag_mines(mine_cells)
+                    time.sleep(0.5)  # Wait for flags to be placed
                 
-                move_count += len(safe_moves)
+                # Execute safe moves (if any)
+                if safe_moves:
+                    self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
+                    self.controller.click_safe_cells(safe_moves)
+                else:
+                    self._update_status("No safe moves found this iteration.")
+                
+                move_count += len(safe_moves) + len(mine_cells)
                 self._update_progress(min(20 + (move_count * 0.8), 95))
                 
                 # Small delay between moves
                 time.sleep(0.5)
                 
-                # Check for win condition (no unopened cells left)
+                # Check for win condition (no unopened cells left AND some revealed content)
                 stats = self.solver.get_board_statistics(board_state)
-                if stats['unopened'] == 0:
+                revealed_content = stats['revealed_numbers'] + stats['blank'] + stats['flagged']
+                
+                if stats['unopened'] == 0 and revealed_content > 0:
                     self._update_status("Game won! All cells revealed.")
+                    break
+                elif stats['unopened'] == 0 and revealed_content == 0:
+                    self._update_status("Board appears empty - may need to restart game.")
                     break
             
             if move_count >= max_moves:

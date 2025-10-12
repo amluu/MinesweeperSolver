@@ -91,33 +91,60 @@ class GoogleMinesweeperDetector:
                 cell_state = self._analyze_cell(cell_region)
                 board_state[(row, col)] = cell_state
         
+        # Debug: Print the board state as a grid
+        self.logger.info("=== OCR DETECTED BOARD STATE ===")
+        for row in range(self.board_config['rows']):
+            row_str = ""
+            for col in range(self.board_config['cols']):
+                state = board_state.get((row, col), '?')
+                if state == 'unopened':
+                    row_str += "U "
+                elif state == 'blank':
+                    row_str += "B "
+                elif state == 'flag':
+                    row_str += "F "
+                elif state.isdigit():
+                    row_str += f"{state} "
+                else:
+                    row_str += "? "
+            self.logger.info(f"Row {row:2d}: {row_str}")
+        self.logger.info("=== END BOARD STATE ===")
+        
         return board_state
     
     def _analyze_cell(self, cell_region: np.ndarray) -> str:
-        """Analyze a single cell region to determine its state."""
-        # Convert to grayscale for analysis
-        if len(cell_region.shape) == 3:
-            gray = cv2.cvtColor(cell_region, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = cell_region
+        """Analyze a single cell region to determine its state using color-based detection."""
+        if len(cell_region.shape) != 3:
+            # Convert grayscale to RGB if needed
+            cell_region = cv2.cvtColor(cell_region, cv2.COLOR_GRAY2RGB)
         
-        # Get average color of the cell
-        avg_color = np.mean(gray)
+        # Sample more of the cell (middle 80%) to better capture numbers
+        h, w = cell_region.shape[:2]
+        center_h = int(h * 0.1)  # Reduced from 0.2 to 0.1 (10% margin instead of 20%)
+        center_w = int(w * 0.1)  # Reduced from 0.2 to 0.1 (10% margin instead of 20%)
+        center_region = cell_region[center_h:h-center_h, center_w:w-center_w]
         
-        # Check for flag (red color)
-        if self._has_flag(cell_region):
+        # Convert to HSV for better color detection
+        hsv = cv2.cvtColor(center_region, cv2.COLOR_RGB2HSV)
+        
+        # Check for flag first (red color)
+        if self._has_flag(center_region):
             return 'flag'
         
-        # Check for revealed number
-        number = self._detect_number(cell_region)
+        # Detect numbers 1-8 by their distinct colors (PRIORITY: check before blank cells)
+        number = self._detect_number_by_color(hsv)
         if number is not None:
             return str(number)
         
-        # Check if cell is blank (revealed but no number)
-        if avg_color > 200:  # Light color indicates revealed blank cell
+        # Check if cell is unopened (bright green) - check before blank
+        if self._is_unopened_cell(hsv):
+            return 'unopened'
+        
+        # Check if cell is revealed blank (beige/tan color) - check LAST
+        if self._is_blank_cell(hsv):
             return 'blank'
         
-        # Default to unopened
+        # Default to unopened if uncertain
         return 'unopened'
     
     def _has_flag(self, cell_region: np.ndarray) -> bool:
@@ -125,44 +152,89 @@ class GoogleMinesweeperDetector:
         # Convert to HSV for better color detection
         hsv = cv2.cvtColor(cell_region, cv2.COLOR_RGB2HSV)
         
-        # Define red color range for flag
-        lower_red = np.array([0, 50, 50])
-        upper_red = np.array([10, 255, 255])
+        # Flag: RGB(242, 54, 7) -> HSV(12, 97, 95)
+        # Need to distinguish from number 3 which is darker red: RGB(211, 48, 47)
+        # Flag is brighter and more orange-red
+        lower_flag = np.array([5, 200, 200])   # Bright orange-red flag
+        upper_flag = np.array([20, 255, 255])  # Very bright red
         
-        # Create mask for red pixels
-        mask = cv2.inRange(hsv, lower_red, upper_red)
+        # Create mask for flag pixels
+        mask = cv2.inRange(hsv, lower_flag, upper_flag)
         
-        # Count red pixels
-        red_pixels = cv2.countNonZero(mask)
+        # Count flag pixels
+        flag_pixels = cv2.countNonZero(mask)
         
-        # Flag if significant red pixels present
-        return red_pixels > (cell_region.shape[0] * cell_region.shape[1] * 0.1)
+        # Flag if significant bright red pixels present
+        # Higher threshold to avoid confusion with number 3
+        return flag_pixels > (cell_region.shape[0] * cell_region.shape[1] * 0.2)
     
-    def _detect_number(self, cell_region: np.ndarray) -> Optional[int]:
-        """Detect number in a revealed cell."""
-        # Convert to grayscale
-        if len(cell_region.shape) == 3:
-            gray = cv2.cvtColor(cell_region, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = cell_region
+    def _detect_number_by_color(self, hsv_region: np.ndarray) -> Optional[int]:
+        """Detect number 1-8 by their distinct colors in HSV."""
+        # Define color ranges based on actual RGB values from Google Minesweeper
+        # Convert RGB to HSV and add tolerance ranges
         
-        # Simple number detection based on average brightness
-        # This is a simplified approach - could be enhanced with OCR
-        avg_brightness = np.mean(gray)
+        number_colors = {
+            1: ([105, 140, 150], [115, 255, 255]),  # Blue: RGB(56, 116, 203) -> HSV(212, 72, 80)
+            2: ([36, 108, 120], [76, 148, 160]),    # Green: RGB(80, 140, 70) -> HSV(56, 128, 140)
+            3: ([0, 161, 174], [22, 201, 214]),     # Red: RGB(194, 63, 56) -> HSV(2, 181, 194)
+            4: ([140, 150, 60], [160, 255, 180]),   # Purple: RGB(123, 32, 162) -> HSV(283, 80, 64)
+            5: ([20, 150, 150], [40, 255, 255]),    # Orange: RGB(255, 143, 0) -> HSV(33, 100, 100)
+            6: ([90, 150, 100], [110, 255, 220]),   # Cyan: RGB(0, 151, 167) -> HSV(184, 100, 65)
+            7: ([0, 0, 20], [180, 50, 100]),        # Dark gray: RGB(66, 66, 66) -> HSV(0, 0, 26)
+            8: ([0, 0, 80], [180, 80, 200])         # Light gray: RGB(156, 158, 159) -> HSV(0, 2, 62)
+        }
         
-        # Check for specific number colors
-        # This is a basic implementation - would need refinement based on actual game colors
-        if avg_brightness < 100:  # Dark numbers
-            # Count dark pixels to estimate number
-            dark_pixels = np.sum(gray < 100)
-            total_pixels = gray.shape[0] * gray.shape[1]
+        best_match = None
+        best_count = 0
+        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.1  # 10% of pixels - more reasonable threshold
+        
+        for number, (lower, upper) in number_colors.items():
+            # Create mask for this color range
+            lower = np.array(lower)
+            upper = np.array(upper)
+            mask = cv2.inRange(hsv_region, lower, upper)
             
-            if dark_pixels > total_pixels * 0.3:  # Significant dark content
-                # This is a placeholder - real implementation would use OCR or template matching
-                # For now, return a placeholder number
-                return 1  # Placeholder
+            # Count matching pixels
+            count = cv2.countNonZero(mask)
+            
+            # Debug logging for numbers 2 and 3
+            if number in [2, 3]:  # Log all detection attempts for 2 and 3
+                self.logger.debug(f"Number {number}: {count} pixels (threshold: {threshold}) - {'MATCH' if count > threshold else 'below threshold'}")
+            
+            if count > best_count and count > threshold:
+                best_count = count
+                best_match = number
         
-        return None
+        return best_match
+    
+    def _is_blank_cell(self, hsv_region: np.ndarray) -> bool:
+        """Check if cell is revealed blank (beige/tan color)."""
+        # Blank cells: RGB(215, 184, 153) or RGB(229, 194, 159) -> HSV(25, 29, 84) or HSV(26, 31, 90)
+        # Beige/tan colors: low saturation, medium-high brightness
+        lower_beige = np.array([15, 20, 140])  # Light beige - wider range
+        upper_beige = np.array([35, 80, 255])  # Light tan - wider range
+        
+        mask = cv2.inRange(hsv_region, lower_beige, upper_beige)
+        count = cv2.countNonZero(mask)
+        
+        # Lower threshold since blank cells might be smaller portions
+        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.25
+        return count > threshold
+    
+    def _is_unopened_cell(self, hsv_region: np.ndarray) -> bool:
+        """Check if cell is unopened (bright green color)."""
+        # Unopened cells: RGB(170, 215, 80) or RGB(162, 209, 72) -> HSV(84, 63, 84) or HSV(86, 66, 82)
+        # Need to distinguish from number 2 which is darker green
+        lower_green = np.array([80, 150, 180])  # Bright green unopened cells
+        upper_green = np.array([90, 255, 255])  # Very bright green
+        
+        mask = cv2.inRange(hsv_region, lower_green, upper_green)
+        count = cv2.countNonZero(mask)
+        
+        # Need significant bright green pixels to be considered unopened
+        # Higher threshold to avoid confusion with number 2
+        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.4
+        return count > threshold
     
     def get_board_dimensions(self) -> Tuple[int, int]:
         """Get the current board dimensions (rows, cols)."""
@@ -186,6 +258,14 @@ class GoogleMinesweeperDetector:
                         f"final coords ({cell_x}, {cell_y})")
         
         return cell_x, cell_y
+    
+    def is_board_fresh(self, board_state: Dict[Tuple[int, int], str]) -> bool:
+        """Check if board is completely unopened (fresh game)."""
+        unopened_count = sum(1 for state in board_state.values() if state == 'unopened')
+        total_cells = len(board_state)
+        is_fresh = unopened_count == total_cells
+        self.logger.info(f"Board freshness check: {unopened_count}/{total_cells} unopened cells - {'FRESH' if is_fresh else 'IN_PROGRESS'}")
+        return is_fresh
     
     def save_debug_image(self, image: Image.Image, filename: str = "debug_board.png"):
         """Save board image for debugging purposes."""

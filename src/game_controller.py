@@ -22,6 +22,23 @@ class GoogleMinesweeperController:
         """Set the board detector for coordinate calculation."""
         self.detector = detector
     
+    def select_tab(self):
+        """Click center of board to focus the Minesweeper tab."""
+        if not self.detector:
+            raise RuntimeError("Detector not set. Call set_detector() first.")
+        
+        if not self.detector.board_config:
+            raise RuntimeError("Board config not set. Call set_difficulty() first.")
+        
+        # Calculate center of board
+        board_config = self.detector.board_config
+        center_x = board_config['x'] + (board_config['width'] // 2)
+        center_y = board_config['y'] + (board_config['height'] // 2)
+        
+        self.logger.info(f"Selecting Minesweeper tab by clicking board center at ({center_x}, {center_y})")
+        pyautogui.click(center_x, center_y)
+        time.sleep(0.3)  # Brief wait for focus
+    
     def set_difficulty(self, difficulty: str):
         """Set the game difficulty by clicking the dropdown."""
         if difficulty not in ['easy', 'medium', 'hard']:
@@ -29,14 +46,20 @@ class GoogleMinesweeperController:
         
         self.logger.info(f"Setting difficulty to {difficulty}")
         
+        # Medium is the default, no clicking needed
+        if difficulty == 'medium':
+            self.logger.info("Medium is default, no dropdown interaction needed")
+            return
+        
+        # Focus the Minesweeper tab first
+        self.select_tab()
+        
         # Get dropdown coordinates
         dropdown_x = self.config.getint('difficulty_selector', 'dropdown_x')
         dropdown_y = self.config.getint('difficulty_selector', 'dropdown_y')
         
-        # Click dropdown twice to ensure it opens (first click might focus window)
+        # Click dropdown to open it
         pyautogui.click(dropdown_x, dropdown_y)
-        time.sleep(0.3)  # Brief wait
-        pyautogui.click(dropdown_x, dropdown_y)  # Second click to actually open dropdown
         time.sleep(0.5)  # Wait for dropdown to open
         
         # Click appropriate difficulty option
@@ -50,8 +73,6 @@ class GoogleMinesweeperController:
             hard_y = self.config.getint('difficulty_selector', 'hard_y')
             pyautogui.click(hard_x, hard_y)
             self.logger.info("Selected Hard difficulty")
-        else:  # medium
-            self.logger.info("Medium is default, no additional click needed")
         
         time.sleep(1.0)  # Wait for game to load
     
@@ -60,11 +81,14 @@ class GoogleMinesweeperController:
         if not self.detector:
             raise RuntimeError("Detector not set. Call set_detector() first.")
         
+        # Focus the Minesweeper tab first
+        self.select_tab()
+        
         # Get cell coordinates from detector
         x, y = self.detector.get_cell_coordinates(row, col)
         
         # Debug logging
-        self.logger.info(f"Attempting to click cell ({row}, {col}) at coordinates ({x}, {y})")
+        self.logger.info(f"Clicking cell ({row}, {col}) at coordinates ({x}, {y})")
         
         # Get current screen size for validation
         screen_width, screen_height = pyautogui.size()
@@ -75,7 +99,7 @@ class GoogleMinesweeperController:
             self.logger.error(f"Coordinates ({x}, {y}) are outside screen bounds!")
             return
         
-        # Move mouse to coordinates first (for debugging)
+        # Move mouse to coordinates and click
         pyautogui.moveTo(x, y, duration=0.5)
         time.sleep(0.2)
         
@@ -114,7 +138,7 @@ class GoogleMinesweeperController:
                 self.logger.error(f"Failed to flag cell ({row}, {col}): {e}")
     
     def make_move(self, row: int, col: int, action: str = 'reveal'):
-        """Make a move (reveal or flag) on a specific cell."""
+        """Make a move (reveal or flag) on a specific cell using double-click logic."""
         if action == 'reveal':
             self.click_cell(row, col, 'left')
         elif action == 'flag':
@@ -128,11 +152,15 @@ class GoogleMinesweeperController:
         if not self.detector:
             raise RuntimeError("Detector not set. Call set_detector() first.")
         
+        # Focus the Minesweeper tab first
+        self.select_tab()
+        
         # Calculate smiley face position (approximate)
         board_config = self.detector.board_config
         smiley_x = board_config['x'] + (board_config['width'] // 2)
         smiley_y = board_config['y'] - 50  # Above the board
         
+        self.logger.info(f"Clicking smiley face at ({smiley_x}, {smiley_y}) to start new game")
         pyautogui.click(smiley_x, smiley_y)
         self.logger.info("Clicked smiley face to start new game")
         time.sleep(1.0)  # Wait for new game to start
