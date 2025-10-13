@@ -5,7 +5,7 @@ from .csp_solver import MinesweeperCSPSolver
 class MinesweeperSolver:
     """Handles the minesweeper solving logic."""
     
-    # Standard Minesweeper mine counts
+    # Google Minesweeper mine counts
     MINE_COUNTS = {
         'easy': 10,
         'medium': 40, 

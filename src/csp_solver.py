@@ -4,7 +4,7 @@ from ortools.sat.python import cp_model
 class MinesweeperCSPSolver:
     """Constraint solver for Minesweeper using OR-Tools CP-SAT."""
     
-    # Standard Minesweeper mine counts
+    # Google Minesweeper mine counts
     MINE_COUNTS = {
         'easy': 10,
         'medium': 40, 
@@ -47,7 +47,7 @@ class MinesweeperCSPSolver:
         for cell in frontier_cells:
             v = cell_vars[cell]
             
-            # Test if cell can be safe (not a mine)
+            # Test if cell can be safe
             model_copy = model.Clone()
             model_copy.AddAssumption(v.Not())
             safe_status = solver.Solve(model_copy)
@@ -56,7 +56,6 @@ class MinesweeperCSPSolver:
             model_copy2 = model.Clone()
             model_copy2.AddAssumption(v)
             mine_status = solver.Solve(model_copy2)
-
 
             safe_feasible = safe_status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
             mine_feasible = mine_status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
@@ -81,7 +80,6 @@ class MinesweeperCSPSolver:
         """
         Calculate the probability that each frontier cell contains a mine using sampling.
         Returns dict mapping cell coordinates to mine probability (0.0 to 1.0).
-        Note: These are sampled probabilities, not exact probabilities.
         """
         frontier_cells = self._get_frontier_cells(board, state_manager)
         if not frontier_cells:
