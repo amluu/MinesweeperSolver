@@ -21,27 +21,18 @@ python main.py
 ### Directory Structure
 ```
 MinesweeperSolver/
-├── main.py                 # Entry point with GUI
-├── config.ini              # Configuration file
-├── requirements.txt        # Python dependencies
-├── README.md               # Documentation
-├── src/                    # Source code modules
+├── main.py                 # Entry point
+├── config.ini              # Google Minesweeper configuration
+├── requirements.txt        
+├── README.md               
+├── src/                    
 │   ├── board_detector.py   # Board detection and analysis
 │   ├── csp_solver.py       # Constraint satisfaction problem solver
-│   ├── deterministic_solver.py # Core solving logic
+│   ├── deterministic_solver.py # Deterministic solving logic
 │   ├── game_controller.py  # Game interaction and control
 │   ├── gui.py              # GUI interface
 │   └── state_manager.py    # Game state tracking
 ```
-
-### Key Classes
-
-- **`GoogleMinesweeperGUI`**: Tkinter-based GUI for solver control
-- **`MinesweeperSolver`**: Core deterministic solving logic
-- **`MinesweeperCSPSolver`**: Constraint satisfaction problem solver for advanced deduction
-- **`MinesweeperStateManager`**: Game state tracking and management
-- **`GoogleMinesweeperDetector`**: Board detection and analysis
-- **`GoogleMinesweeperController`**: Game interaction and control
 
 ## Tools & Technologies
 
