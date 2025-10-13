@@ -3,17 +3,11 @@ from tkinter import ttk, messagebox
 import threading
 import time
 from typing import Optional, Callable
-try:
-    import keyboard  # For global hotkeys
-    KEYBOARD_AVAILABLE = True
-except ImportError:
-    KEYBOARD_AVAILABLE = False
 from .board_detector import GoogleMinesweeperDetector
 from .game_controller import GoogleMinesweeperController
-from .solver import MinesweeperSolver
+from .deterministic_solver import MinesweeperSolver
 
-class UniversalMinesweeperGUI:
-    """GUI for universal minesweeper solver."""
+class GoogleMinesweeperGUI:
     
     def __init__(self):
         """Initialize the GUI."""
@@ -41,15 +35,6 @@ class UniversalMinesweeperGUI:
         # Bind ESC key to stop solver (works when GUI has focus)
         self.root.bind('<Escape>', lambda e: self._stop_solver())
         
-        # Set up global ESC hotkey if keyboard module is available
-        if KEYBOARD_AVAILABLE:
-            try:
-                keyboard.add_hotkey('esc', self._stop_solver)
-                self.global_hotkey_enabled = True
-            except Exception as e:
-                self.global_hotkey_enabled = False
-        else:
-            self.global_hotkey_enabled = False
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="20")
@@ -114,15 +99,6 @@ class UniversalMinesweeperGUI:
         self.stop_btn = ttk.Button(control_frame, text="Stop", 
                                   command=self._stop_solver, state="disabled")
         self.stop_btn.grid(row=0, column=1)
-        
-        # Stop instructions
-        if self.global_hotkey_enabled:
-            esc_text = "Press ESC to stop the solver (works anywhere)."
-        else:
-            esc_text = "Select this window and press ESC to stop."
-        
-        stop_instructions = ttk.Label(main_frame, text=esc_text, justify=tk.LEFT)
-        stop_instructions.grid(row=5, column=0, columnspan=3, pady=(0, 0))
         
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
@@ -270,15 +246,9 @@ class UniversalMinesweeperGUI:
                             final_flags_to_execute = final_mine_cells if not self.no_flag_mode.get() else []
                             
                             if final_mine_cells and final_safe_moves:
-                                if self.no_flag_mode.get():
-                                    self._update_status(f"Executing final safe moves: {len(final_safe_moves)} (mines not flagged due to no-flag mode)")
-                                else:
-                                    self._update_status(f"Executing final batch: {len(final_mine_cells)} mines and {len(final_safe_moves)} safe moves...")
+                                self._update_status(f"Executing final safe moves: {len(final_safe_moves)}")
                             elif final_mine_cells:
-                                if self.no_flag_mode.get():
-                                    self._update_status(f"Found {len(final_mine_cells)} final mines (not flagging due to no-flag mode)")
-                                else:
-                                    self._update_status(f"Executing final {len(final_mine_cells)} mine flags...")
+                                self._update_status(f"Found {len(final_mine_cells)} final mines")
                             else:
                                 self._update_status(f"Executing final {len(final_safe_moves)} safe moves...")
                             
@@ -340,15 +310,9 @@ class UniversalMinesweeperGUI:
                     flags_to_execute = mine_cells if not self.no_flag_mode.get() else []
                     
                     if mine_cells and safe_moves:
-                        if self.no_flag_mode.get():
-                            self._update_status(f"Found {len(mine_cells)} mines (not flagging) and {len(safe_moves)} safe moves. Executing safe moves...")
-                        else:
-                            self._update_status(f"Found {len(mine_cells)} mines and {len(safe_moves)} safe moves. Executing batch...")
+                        self._update_status(f"Found {len(mine_cells)} mines and {len(safe_moves)} safe moves. Executing...")
                     elif mine_cells:
-                        if self.no_flag_mode.get():
-                            self._update_status(f"Found {len(mine_cells)} mines (not flagging due to no-flag mode)")
-                        else:
-                            self._update_status(f"Found {len(mine_cells)} mines to flag. Flagging...")
+                        self._update_status(f"Found {len(mine_cells)} mines")
                     else:
                         self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
                     
@@ -486,10 +450,4 @@ class UniversalMinesweeperGUI:
     
     def destroy(self):
         """Destroy the GUI."""
-        # Clean up global hotkey if it was set
-        if hasattr(self, 'global_hotkey_enabled') and self.global_hotkey_enabled and KEYBOARD_AVAILABLE:
-            try:
-                keyboard.unhook_all_hotkeys()
-            except Exception:
-                pass
         self.root.destroy()

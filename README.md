@@ -1,13 +1,6 @@
-# Universal Minesweeper Solver v2.0
+# Google Minesweeper Solver v3.0
 
-A minesweeper solver starting fresh - board detection features have been removed and the project is ready for new implementation.
-
-## Features
-
-- **Clean Slate**: All board detection features removed for fresh start
-- **Modular Architecture**: Clean separation of concerns with dedicated classes
-- **User-Friendly GUI**: Simple interface ready for new functionality
-- **Ready for Implementation**: Clean codebase ready for new solver logic
+A Google Minesweeper Solver
 
 ## Installation
 
@@ -22,13 +15,8 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
-
-2. **Current status**:
-   - Board detection features have been removed
-   - GUI is available but solver functionality needs new implementation
-   - Ready for fresh development
-
-## Architecture
+2. **Solve!**:
+* change the difficulty to match your board and watch it run!
 
 ### Directory Structure
 ```
@@ -38,24 +26,60 @@ MinesweeperSolver/
 ├── requirements.txt        # Python dependencies
 ├── README.md               # Documentation
 ├── src/                    # Source code modules
-│   ├── solver.py           # Core solving logic
-│   └── gui.py              # Universal GUI interface
-├── assets/                 # Images and resources
-└── temp/                   # Temporary files (cleaned)
+│   ├── __init__.py         # Package initialization
+│   ├── board_detector.py   # Board detection and analysis
+│   ├── csp_solver.py       # Constraint satisfaction problem solver
+│   ├── deterministic_solver.py # Core solving logic
+│   ├── game_controller.py  # Game interaction and control
+│   ├── gui.py              # GUI interface
+│   └── state_manager.py    # Game state tracking
 ```
 
 ### Key Classes
 
-- **`UniversalMinesweeperGUI`**: Tkinter-based GUI for solver control
-- **`MinesweeperSolver`**: Core solving logic (ready for implementation)
+- **`GoogleMinesweeperGUI`**: Tkinter-based GUI for solver control
+- **`MinesweeperSolver`**: Core deterministic solving logic
+- **`MinesweeperCSPSolver`**: Constraint satisfaction problem solver for advanced deduction
+- **`MinesweeperStateManager`**: Game state tracking and management
+- **`GoogleMinesweeperDetector`**: Board detection and analysis
+- **`GoogleMinesweeperController`**: Game interaction and control
 
-## Current Status
+## Tools & Technologies
 
-- ✅ **Board Detection Removed**: All detection-related code deleted
-- ✅ **Clean Codebase**: Ready for fresh implementation
-- ✅ **GUI Available**: Basic interface ready for new functionality
-- ✅ **Modular Structure**: Clean separation of concerns maintained
+### Computer Vision & Screen Capture
+- **pyautogui**: Automated screen capture and mouse/keyboard control
+- **mss**: High-performance screen capture for board detection
+- **Pillow (PIL)**: Image processing and manipulation
+- **OpenCV**: Computer vision for board analysis and cell detection
+- **NumPy**: Numerical operations on image data
 
-## Next Steps
+### Solving Algorithms
 
-The project is now ready for new implementation. All board detection features have been removed and the codebase is clean for starting fresh development.
+#### 1. Deterministic Logic
+- **Basic Pattern Recognition**: Identifies obvious safe moves and mines
+- **Neighbor Analysis**: Analyzes numbered cells and their surrounding cells
+- **Constraint Satisfaction**: Determines mines based on number constraints
+
+#### 2. Constraint Satisfaction Problem (CSP) Solver
+- **OR-Tools**: Google's optimization library for advanced constraint solving
+- **Multi-constraint Analysis**: Considers multiple numbered cells simultaneously
+- **Probability Calculation**: Computes mine probabilities for uncertain situations
+
+#### 3. Probabilistic Strategy
+- **Risk Assessment**: Calculates safest moves when no certain moves exist
+- **Probability-based Decision Making**: Chooses cells with lowest mine probability
+- **Fallback Mechanism**: Enables continued solving when deterministic methods fail
+
+### Game State Management
+- **State Tracking**: Maintains internal representation of board state
+- **Flag Management**: Tracks flagged mines for accurate constraint solving
+- **Move History**: Prevents infinite loops and detects stuck states
+- **Board Synchronization**: Merges OCR results with internal state
+
+### Board Detection & Analysis
+- **Pixel-perfect Detection**: Uses precise coordinates for Google Minesweeper
+- **OCR Integration**: Reads numbers and board state from screenshots
+- **Multi-difficulty Support**: Adapts to Easy (9x9), Medium (16x16), Hard (16x30)
+- **Real-time Analysis**: Continuously monitors board changes during solving
+
+

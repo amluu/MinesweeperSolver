@@ -2,7 +2,7 @@
 """
 Google Minesweeper Solver - Main Entry Point
 
-A hardcoded minesweeper solver specifically designed for Google Minesweeper.
+A minesweeper solver specifically designed for Google Minesweeper.
 Uses precise pixel coordinates and dimensions for board detection and game control.
 Optimized for Google Chrome at 110% zoom.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.gui import UniversalMinesweeperGUI
+from src.gui import GoogleMinesweeperGUI
 
 
 def check_dependencies():
@@ -30,7 +30,7 @@ def check_dependencies():
 
 def verify_structure():
     """Verify that the required directory structure exists."""
-    required_dirs = ['src', 'assets', 'temp']
+    required_dirs = ['src']
     required_files = ['config.ini']
     
     for dir_name in required_dirs:
@@ -62,7 +62,7 @@ def main():
     
     try:
         # Create and run GUI
-        gui = UniversalMinesweeperGUI()
+        gui = GoogleMinesweeperGUI()
         
         # Run the GUI (this will block until closed)
         gui.run()
