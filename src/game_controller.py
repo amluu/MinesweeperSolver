@@ -4,7 +4,7 @@ from typing import Tuple, List
 import pyautogui
 
 class GoogleMinesweeperController:
-    """Game controller for Google Minesweeper using hardcoded coordinates."""
+    """Game controller for Google Minesweeper."""
     
     def __init__(self, config_path: str = "config.ini"):
         """Initialize the controller with configuration."""
@@ -12,7 +12,7 @@ class GoogleMinesweeperController:
         self.config.read(config_path)
         self.detector = None
         
-        # Configure pyautogui for faster execution
+        # Configure pyautogui
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.01
         
@@ -37,13 +37,10 @@ class GoogleMinesweeperController:
         time.sleep(0.1)
     
     def set_difficulty(self, difficulty: str):
-        """Set the game difficulty - user must manually select difficulty."""
+        """Set the game difficulty."""
         if difficulty not in ['easy', 'medium', 'hard']:
             raise ValueError(f"Invalid difficulty: {difficulty}")
         
-        
-        # The first click is always the center click
-    
     def click_cell(self, row: int, col: int, button: str = 'left', focus_tab: bool = True):
         """Click a specific cell on the board."""
         if not self.detector:
@@ -82,7 +79,6 @@ class GoogleMinesweeperController:
         if total_moves == 0:
             return
             
-        
         # Focus tab 
         if focus_tab:
             self.select_tab()
