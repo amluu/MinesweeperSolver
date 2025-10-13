@@ -15,7 +15,6 @@ class GoogleMinesweeperGUI:
         self.solver_thread: Optional[threading.Thread] = None
         self.is_running = False
         
-        
         # Initialize components
         self.detector = GoogleMinesweeperDetector()
         self.controller = GoogleMinesweeperController()
@@ -34,7 +33,6 @@ class GoogleMinesweeperGUI:
         
         # Bind ESC key to stop solver (works when GUI has focus)
         self.root.bind('<Escape>', lambda e: self._stop_solver())
-        
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="20")
@@ -105,7 +103,6 @@ class GoogleMinesweeperGUI:
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
         status_frame.columnconfigure(0, weight=1)
-    
     
     def _start_solver(self):
         """Start the solver in a separate thread."""
@@ -416,7 +413,6 @@ class GoogleMinesweeperGUI:
         This method blocks until the window is closed.
         """
         self.root.mainloop()
-    
     
     def update_status(self, message: str):
         """Update the status label."""
