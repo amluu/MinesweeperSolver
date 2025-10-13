@@ -26,7 +26,6 @@ MinesweeperSolver/
 ├── requirements.txt        # Python dependencies
 ├── README.md               # Documentation
 ├── src/                    # Source code modules
-│   ├── __init__.py         # Package initialization
 │   ├── board_detector.py   # Board detection and analysis
 │   ├── csp_solver.py       # Constraint satisfaction problem solver
 │   ├── deterministic_solver.py # Core solving logic

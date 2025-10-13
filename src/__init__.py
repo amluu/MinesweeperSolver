@@ -1,1 +1,0 @@
-# Minesweeper Solver Package
