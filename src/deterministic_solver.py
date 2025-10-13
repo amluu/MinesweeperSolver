@@ -180,7 +180,7 @@ class MinesweeperSolver:
         stats = {
             'total_cells': self.grid_rows * self.grid_cols,
             'unopened': 0,
-            'flagged': len(self.state_manager.get_flagged_cells()),  # Use state manager
+            'flagged': 0,
             'revealed_numbers': 0,
             'blank': 0,
             'unknown': 0,
@@ -192,11 +192,9 @@ class MinesweeperSolver:
             if content == 'unopened':
                 stats['unopened'] += 1
             elif content == 'flag':
-                # Don't double-count flags (already counted from state manager)
-                pass
+                stats['flagged'] += 1
             elif content.isdigit():
                 stats['revealed_numbers'] += 1
-                # Count individual numbers
                 number = int(content)
                 if 1 <= number <= 8:
                     stats[f'number_{number}'] += 1
