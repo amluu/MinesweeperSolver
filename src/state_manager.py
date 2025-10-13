@@ -1,7 +1,7 @@
 from typing import Dict, Set, Tuple, Optional, List
 
 class MinesweeperStateManager:
-    """Manages the internal state of the minesweeper game independently of OCR detection."""
+    """Manages the internal state of the minesweeper game."""
     
     def __init__(self, rows: int, cols: int, difficulty: str = 'medium'):
         """Initialize the state manager with board dimensions and difficulty."""
@@ -15,7 +15,6 @@ class MinesweeperStateManager:
         
         # Track moves made by the solver
         self.moves_made: List[Tuple[int, int, str]] = []  # (row, col, action)
-        
     
     def flag_cell(self, row: int, col: int) -> bool:
         """Flag a cell as a mine. Returns True if successful, False if already flagged."""
@@ -40,7 +39,6 @@ class MinesweeperStateManager:
         self.revealed_cells.add((row, col))
         self.moves_made.append((row, col, 'reveal'))
         return True
-    
     
     def is_flagged(self, row: int, col: int) -> bool:
         """Check if a cell is flagged."""
@@ -74,24 +72,19 @@ class MinesweeperStateManager:
         return all_cells - self.flagged_cells - self.revealed_cells
     
     def merge_with_ocr_board(self, ocr_board: Dict[Tuple[int, int], str]) -> Dict[Tuple[int, int], str]:
-        """
-        Merge OCR-detected board with internal state.
-        OCR is only used for numbers, blanks, and unopened detection.
-        Flags are ALWAYS taken from internal state, never from OCR.
-        """
+        """Merge OCR-detected board with internal state."""
         merged_board = {}
         
         for row in range(self.rows):
             for col in range(self.cols):
                 cell_pos = (row, col)
                 
-                # CRITICAL: Internal flag state ALWAYS takes precedence over OCR
-                # Even if OCR sees a number where we have a flag, we keep the flag
+                # Keep flag from internal state
                 if self.is_flagged(row, col):
                     merged_board[cell_pos] = 'flag'
                     continue
                 
-                # Use OCR for revealed content (numbers, blanks) only for non-flagged cells
+                # Use OCR for revealed content
                 if cell_pos in ocr_board:
                     ocr_content = ocr_board[cell_pos]
                     
@@ -104,10 +97,10 @@ class MinesweeperStateManager:
                     elif ocr_content == 'unopened':
                         merged_board[cell_pos] = 'unopened'
                     else:
-                        # For any other OCR content on non-flagged cells, use OCR
+                        # Use OCR
                         merged_board[cell_pos] = ocr_content
                 else:
-                    # No OCR data, use internal state
+                    # Use internal state
                     merged_board[cell_pos] = self.get_cell_state(row, col)
         
         return merged_board
@@ -140,31 +133,3 @@ class MinesweeperStateManager:
             raise ValueError(f"Invalid difficulty: {difficulty}")
         self.difficulty = difficulty
     
-    
-    def validate_board_state(self, ocr_board: Dict[Tuple[int, int], str]) -> bool:
-        """
-        Validate that our internal state is consistent with OCR detection.
-        Returns True if consistent, False if there are conflicts.
-        """
-        conflicts = []
-        
-        for row in range(self.rows):
-            for col in range(self.cols):
-                cell_pos = (row, col)
-                
-                # Check for conflicts between internal flag state and OCR
-                if self.is_flagged(row, col):
-                    if cell_pos in ocr_board and ocr_board[cell_pos] != 'flag':
-                        conflicts.append(f"Cell ({row}, {col}): Internal=flag, OCR={ocr_board.get(cell_pos, 'unknown')}")
-                
-                # Check for conflicts with revealed cells
-                if self.is_revealed(row, col):
-                    if cell_pos in ocr_board:
-                        ocr_content = ocr_board[cell_pos]
-                        if ocr_content == 'unopened':
-                            conflicts.append(f"Cell ({row}, {col}): Internal=revealed, OCR=unopened")
-        
-        if conflicts:
-            return False
-        
-        return True
