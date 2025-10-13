@@ -66,6 +66,7 @@ class MinesweeperCSPSolver:
             elif not mine_feasible and safe_feasible:
                 certain_safe.append(cell)
             elif not safe_feasible and not mine_feasible:
+                pass
 
         if len(certain_mines) > 50 or len(certain_safe) > 50:
             return [], []
@@ -210,6 +211,7 @@ class MinesweeperCSPSolver:
                     model.Add(sum(unopened_neighbor_vars) + flagged_neighbors == number)
                     constraints_added += 1
                 else:
+                    pass
         
         # Global mine count constraint
         total_flagged = len(state_manager.get_flagged_cells())
@@ -267,6 +269,7 @@ class MinesweeperCSPSolver:
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             solutions = collector.solutions
         else:
+            solutions = []
         
         return solutions
     
