@@ -1,24 +1,43 @@
 import logging
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 from .state_manager import MinesweeperStateManager
+from .csp_solver import MinesweeperCSPSolver
 
 class MinesweeperSolver:
     """Handles the minesweeper solving logic."""
     
-    def __init__(self, grid_rows: int, grid_cols: int):
-        """Initialize the solver with grid dimensions."""
+    # Standard Minesweeper mine counts
+    MINE_COUNTS = {
+        'easy': 10,
+        'medium': 40, 
+        'hard': 99
+    }
+    
+    def __init__(self, grid_rows: int, grid_cols: int, difficulty: str = 'medium'):
+        """Initialize the solver with grid dimensions and difficulty."""
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
+        self.difficulty = difficulty
+        self.max_mines = self.MINE_COUNTS.get(difficulty, 99)
         self.logger = logging.getLogger(__name__)
         # Set to INFO level to reduce excessive debug output
         self.logger.setLevel(logging.INFO)
         
         # Initialize state manager for tracking flags and revealed cells
-        self.state_manager = MinesweeperStateManager(grid_rows, grid_cols)
+        self.state_manager = MinesweeperStateManager(grid_rows, grid_cols, difficulty)
+        
+        # Initialize CSP solver
+        self.csp_solver = MinesweeperCSPSolver(grid_rows, grid_cols, difficulty)
+        
+        # Probabilistic mode flag
+        self.use_probabilistic = False
     
     def find_safe_moves(self, ocr_board: Dict[Tuple[int, int], str]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
         """
-        Find safe moves and mine cells based on the current board state.
+        Find safe moves and mine cells using three-tier approach:
+        1. Deterministic logic (existing)
+        2. CSP solver for advanced deduction
+        3. Flag count check for endgame
         Returns a tuple of (safe_moves, mine_cells_to_flag).
         """
         # Merge OCR board with internal state (flags come from state manager)
@@ -29,13 +48,32 @@ class MinesweeperSolver:
         state_manager_flags = len(self.state_manager.get_flagged_cells())
         self.logger.info(f"After merge: {flagged_count} cells marked as 'flag' in merged board, {state_manager_flags} flags in state manager")
         
-        # First pass: identify mines where we're certain
+        # Tier 1: Deterministic logic (existing)
         mine_cells = self._identify_mines(merged_board)
-        
-        # Second pass: find safe moves
         safe_moves = self._find_safe_moves_from_board(merged_board)
         
-        return safe_moves, mine_cells
+        # If deterministic found moves, return them
+        if safe_moves or mine_cells:
+            self.logger.info(f"Deterministic solver found {len(safe_moves)} safe moves and {len(mine_cells)} mines")
+            return safe_moves, mine_cells
+        
+        # Tier 2: CSP solver for advanced deduction
+        self.logger.info("Deterministic solver found no moves, trying CSP solver...")
+        csp_mines, csp_safe = self.csp_solver.find_certain_cells(merged_board, self.state_manager)
+        
+        if csp_safe or csp_mines:
+            self.logger.info(f"CSP solver found {len(csp_safe)} certain safe cells and {len(csp_mines)} certain mines")
+            return csp_safe, csp_mines
+        
+        # Tier 3: Flag count check for endgame
+        if self.csp_solver.check_flag_count_completion(self.state_manager):
+            self.logger.info(f"Flag count check: {state_manager_flags}/{self.max_mines} mines flagged, all remaining cells are safe")
+            all_safe = self._get_all_unopened_cells(merged_board)
+            return all_safe, []
+        
+        # No moves found by any method
+        self.logger.info("No certain moves found by any method")
+        return [], []
     
     def flag_cell(self, row: int, col: int) -> bool:
         """Flag a cell as a mine using the state manager."""
@@ -259,3 +297,53 @@ class MinesweeperSolver:
             self.logger.info(f"Number breakdown: {', '.join(number_counts)}")
         
         self.logger.info("=" * 40)
+    
+    def get_probabilistic_move(self, ocr_board: Dict[Tuple[int, int], str]) -> Optional[Tuple[int, int]]:
+        """
+        Get the safest probabilistic move (lowest mine probability).
+        Returns the cell with the lowest probability of being a mine, or None if no unopened cells.
+        """
+        merged_board = self.state_manager.merge_with_ocr_board(ocr_board)
+        
+        # Get cell probabilities from CSP solver
+        probabilities = self.csp_solver.get_cell_probabilities(merged_board, self.state_manager)
+        
+        if not probabilities:
+            self.logger.info("No unopened cells for probabilistic analysis")
+            return None
+        
+        # Find cell with lowest mine probability
+        safest_cell = min(probabilities.items(), key=lambda x: x[1])
+        cell, probability = safest_cell
+        
+        self.logger.info(f"Probabilistic move: Cell {cell} has lowest mine probability: {probability:.3f}")
+        return cell
+    
+    def set_probabilistic_mode(self, enabled: bool):
+        """Enable or disable probabilistic mode."""
+        self.use_probabilistic = enabled
+        self.logger.info(f"Probabilistic mode {'enabled' if enabled else 'disabled'}")
+    
+    def is_probabilistic_mode_enabled(self) -> bool:
+        """Check if probabilistic mode is enabled."""
+        return self.use_probabilistic
+    
+    def _get_all_unopened_cells(self, board: Dict[Tuple[int, int], str]) -> List[Tuple[int, int]]:
+        """Get all unopened cells that are not flagged."""
+        unopened_cells = []
+        
+        for row in range(self.grid_rows):
+            for col in range(self.grid_cols):
+                cell = (row, col)
+                
+                # Skip if flagged or revealed
+                if self.state_manager.is_flagged(row, col) or self.state_manager.is_revealed(row, col):
+                    continue
+                
+                # Skip if OCR shows it's revealed
+                if cell in board and (board[cell] in ['blank'] or board.get(cell, '').isdigit()):
+                    continue
+                
+                unopened_cells.append(cell)
+        
+        return unopened_cells

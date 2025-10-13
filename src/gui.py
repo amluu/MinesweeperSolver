@@ -96,6 +96,12 @@ class UniversalMinesweeperGUI:
                                                variable=self.no_flag_mode)
         self.no_flag_checkbox.grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(10, 0))
         
+        # Probabilistic Mode checkbox
+        self.probabilistic_mode = tk.BooleanVar(value=False)
+        self.probabilistic_checkbox = ttk.Checkbutton(difficulty_frame, text="Probabilistic Mode", 
+                                                     variable=self.probabilistic_mode)
+        self.probabilistic_checkbox.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
+        
         # Instructions
         instructions = ttk.Label(main_frame, 
                                 text="Make sure Google Minesweeper is open \nand stays on screen!",
@@ -147,9 +153,12 @@ class UniversalMinesweeperGUI:
             # Then set controller difficulty (which can now use the initialized detector)
             self.controller.set_difficulty(difficulty)
             
-            # Initialize solver with board dimensions
+            # Initialize solver with board dimensions and difficulty
             rows, cols = self.detector.get_board_dimensions()
-            self.solver = MinesweeperSolver(rows, cols)
+            self.solver = MinesweeperSolver(rows, cols, difficulty)
+            
+            # Set probabilistic mode
+            self.solver.set_probabilistic_mode(self.probabilistic_mode.get())
             
             self.status_var.set(f"Initialized {difficulty.title()} ({rows}x{cols} grid)")
             
@@ -298,8 +307,37 @@ class UniversalMinesweeperGUI:
                             # Continue the loop for one more iteration
                             continue
                     else:
-                        self._update_status("Final check confirmed: No safe moves or mines found. Game may be stuck or won.")
-                        break
+                        # Check if probabilistic mode is enabled
+                        if self.solver.is_probabilistic_mode_enabled():
+                            self._update_status("No certain moves found. Trying probabilistic move...")
+                            
+                            # Get the safest probabilistic move
+                            probabilistic_move = self.solver.get_probabilistic_move(final_board_state)
+                            
+                            if probabilistic_move:
+                                self._update_status(f"Making probabilistic move at {probabilistic_move}...")
+                                
+                                # Update state manager
+                                self.solver.reveal_cell(probabilistic_move[0], probabilistic_move[1])
+                                
+                                # Execute the move
+                                self.controller.execute_batch_moves([probabilistic_move], [], focus_tab=True)
+                                time.sleep(0.3)
+                                
+                                move_count += 1
+                                self._update_progress(min(20 + (move_count * 0.8), 95))
+                                
+                                # Continue the loop for one more iteration
+                                continue
+                            else:
+                                self._update_status("No probabilistic moves available. Game may be stuck.")
+                                break
+                        else:
+                            self._update_status("No certain moves found. Enable Probabilistic Mode to continue.")
+                            # Show messagebox to user
+                            self.root.after(0, lambda: messagebox.showinfo("No Certain Moves", 
+                                "No certain moves found. Enable Probabilistic Mode to continue with best-guess moves."))
+                            break
                 
                 # Execute moves efficiently using batch method
                 if mine_cells or safe_moves:
@@ -337,7 +375,34 @@ class UniversalMinesweeperGUI:
                     board_image = self.detector.capture_board()
                     board_state = self.detector.analyze_board(board_image)
                 else:
-                    self._update_status("No safe moves or mines found this iteration.")
+                    # Check if probabilistic mode is enabled
+                    if self.solver.is_probabilistic_mode_enabled():
+                        self._update_status("No certain moves found. Trying probabilistic move...")
+                        
+                        # Get the safest probabilistic move
+                        probabilistic_move = self.solver.get_probabilistic_move(board_state)
+                        
+                        if probabilistic_move:
+                            self._update_status(f"Making probabilistic move at {probabilistic_move}...")
+                            
+                            # Update state manager
+                            self.solver.reveal_cell(probabilistic_move[0], probabilistic_move[1])
+                            
+                            # Execute the move
+                            self.controller.execute_batch_moves([probabilistic_move], [], focus_tab=True)
+                            time.sleep(0.3)
+                            
+                            move_count += 1
+                            self._update_progress(min(20 + (move_count * 0.8), 95))
+                            
+                            # Re-capture board after probabilistic move
+                            self._update_status("Re-capturing board after probabilistic move...")
+                            board_image = self.detector.capture_board()
+                            board_state = self.detector.analyze_board(board_image)
+                        else:
+                            self._update_status("No probabilistic moves available. Game may be stuck.")
+                    else:
+                        self._update_status("No certain moves found this iteration.")
                 
                 # Only count moves that were actually executed
                 move_count += len(safe_moves) + len(flags_to_execute)

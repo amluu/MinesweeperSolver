@@ -4,10 +4,11 @@ from typing import Dict, Set, Tuple, Optional, List
 class MinesweeperStateManager:
     """Manages the internal state of the minesweeper game independently of OCR detection."""
     
-    def __init__(self, rows: int, cols: int):
-        """Initialize the state manager with board dimensions."""
+    def __init__(self, rows: int, cols: int, difficulty: str = 'medium'):
+        """Initialize the state manager with board dimensions and difficulty."""
         self.rows = rows
         self.cols = cols
+        self.difficulty = difficulty
         self.logger = logging.getLogger(__name__)
         
         # Internal state tracking
@@ -17,7 +18,7 @@ class MinesweeperStateManager:
         # Track moves made by the solver
         self.moves_made: List[Tuple[int, int, str]] = []  # (row, col, action)
         
-        self.logger.info(f"Initialized state manager for {rows}x{cols} board")
+        self.logger.info(f"Initialized state manager for {rows}x{cols} board, {difficulty} difficulty")
     
     def flag_cell(self, row: int, col: int) -> bool:
         """Flag a cell as a mine. Returns True if successful, False if already flagged."""
@@ -144,12 +145,23 @@ class MinesweeperStateManager:
             'moves_made': len(self.moves_made)
         }
     
+    def get_difficulty(self) -> str:
+        """Get the current difficulty level."""
+        return self.difficulty
+    
     def reset(self):
         """Reset the state manager for a new game."""
         self.flagged_cells.clear()
         self.revealed_cells.clear()
         self.moves_made.clear()
         self.logger.info("State manager reset for new game")
+    
+    def set_difficulty(self, difficulty: str):
+        """Update the difficulty level."""
+        if difficulty not in ['easy', 'medium', 'hard']:
+            raise ValueError(f"Invalid difficulty: {difficulty}")
+        self.difficulty = difficulty
+        self.logger.info(f"Difficulty updated to {difficulty}")
     
     def log_state(self):
         """Log the current state for debugging."""

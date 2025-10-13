@@ -6,6 +6,9 @@ Pillow>=10.0.0
 numpy>=1.24.0
 opencv-python>=4.8.0
 
+# Constraint solving
+ortools>=9.7.2996
+
 # GUI framework
 tkinter  # Usually included with Python
 
