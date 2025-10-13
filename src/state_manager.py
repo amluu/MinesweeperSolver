@@ -18,6 +18,7 @@ class MinesweeperStateManager:
         # Track moves made by the solver
         self.moves_made: List[Tuple[int, int, str]] = []  # (row, col, action)
         
+        
         self.logger.info(f"Initialized state manager for {rows}x{cols} board, {difficulty} difficulty")
     
     def flag_cell(self, row: int, col: int) -> bool:
@@ -64,6 +65,7 @@ class MinesweeperStateManager:
     def is_flagged(self, row: int, col: int) -> bool:
         """Check if a cell is flagged."""
         return (row, col) in self.flagged_cells
+    
     
     def is_revealed(self, row: int, col: int) -> bool:
         """Check if a cell is revealed."""

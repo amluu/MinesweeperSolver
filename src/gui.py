@@ -226,6 +226,7 @@ class UniversalMinesweeperGUI:
             max_state_history = 5  # Keep last 5 states
             tab_focused_this_iteration = False  # Track if we've focused tab this iteration
             
+            
             while self.is_running and move_count < max_moves:
                 # Reset tab focus tracking for this iteration
                 tab_focused_this_iteration = False
@@ -242,7 +243,9 @@ class UniversalMinesweeperGUI:
                 self.solver.log_board_statistics(stats, move_count + 1)
                 
                 # Check for loops by comparing with previous states
-                board_state_key = tuple(sorted(board_state.items()))
+                # Use merged board state (includes internal flags) for loop detection
+                merged_board = self.solver.get_state_manager().merge_with_ocr_board(board_state)
+                board_state_key = tuple(sorted(merged_board.items()))
                 if board_state_key in previous_board_states:
                     self._update_status("Detected loop in board state. Stopping...")
                     self.logger.warning("Loop detected in board state. Stopping solver...")
@@ -289,6 +292,7 @@ class UniversalMinesweeperGUI:
                                 self._update_status(f"Executing final {len(final_safe_moves)} safe moves...")
                             
                             # Update state manager for final moves (including flags for internal tracking)
+                            # Always update state manager for internal tracking, regardless of flag mode
                             for row, col in final_mine_cells:
                                 self.solver.flag_cell(row, col)
                             for row, col in final_safe_moves:
@@ -358,6 +362,7 @@ class UniversalMinesweeperGUI:
                         self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
                     
                     # Update state manager for all moves (including flags for internal tracking)
+                    # Always update state manager for internal tracking, regardless of flag mode
                     for row, col in mine_cells:
                         self.solver.flag_cell(row, col)
                     for row, col in safe_moves:
