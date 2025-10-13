@@ -1,4 +1,4 @@
-# Google Minesweeper Solver v3.0
+# Google Minesweeper Solver
 
 A Google Minesweeper Solver
 

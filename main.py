@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-Google Minesweeper Solver - Main Entry Point
-
-A minesweeper solver specifically designed for Google Minesweeper.
-Uses precise pixel coordinates and dimensions for board detection and game control.
-Optimized for Google Chrome at 110% zoom.
-"""
 
 import sys
 import os
@@ -47,7 +40,7 @@ def verify_structure():
 
 def main():
     """Main entry point for the minesweeper solver."""
-    print("Google Minesweeper Solver v3.0")
+    print("Google Minesweeper Solver")
     print("=" * 40)
     
     # Check dependencies
@@ -59,14 +52,10 @@ def main():
         print("Please ensure all required files and directories are present.")
         sys.exit(1)
     
-    
+    # Create and run GUI
     try:
-        # Create and run GUI
-        gui = GoogleMinesweeperGUI()
-        
-        # Run the GUI (this will block until closed)
-        gui.run()
-        
+        gui = GoogleMinesweeperGUI()        
+        gui.run()    
         
     except KeyboardInterrupt:
         print("\nApplication interrupted by user")
