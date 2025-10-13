@@ -45,7 +45,7 @@ class GoogleMinesweeperGUI:
                                font=("Arial", 16, "bold"))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
-        # Status frame (moved to top)
+        # Status frame
         status_frame = ttk.LabelFrame(main_frame, text="Status", padding="10")
         status_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         
@@ -59,7 +59,7 @@ class GoogleMinesweeperGUI:
                                           maximum=100, length=230)
         self.progress_bar.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(10, 0))
         
-        # Game Settings frame (moved to middle)
+        # Game Settings frame
         difficulty_frame = ttk.LabelFrame(main_frame, text="Game Settings", padding="10")
         difficulty_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         
@@ -70,7 +70,7 @@ class GoogleMinesweeperGUI:
                                            values=["easy", "medium", "hard"], state="readonly", width=14)
         self.difficulty_combo.grid(row=0, column=1, padx=(0, 15))
         
-        # No Flag Mode checkbox on a new row
+        # No Flag Mode checkbox
         self.no_flag_mode = tk.BooleanVar(value=False)
         self.no_flag_checkbox = ttk.Checkbutton(difficulty_frame, text="No Flag Mode", 
                                                variable=self.no_flag_mode)
@@ -82,13 +82,13 @@ class GoogleMinesweeperGUI:
                                                      variable=self.probabilistic_mode)
         self.probabilistic_checkbox.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         
-        # Instructions
+        # Instructions text
         instructions = ttk.Label(main_frame, 
                                 text="Make sure Google Minesweeper is open \nand stays on screen!",
                                 justify=tk.LEFT)
         instructions.grid(row=3, column=0, columnspan=3, pady=(0, 20))
         
-        # Control buttons frame (moved to bottom)
+        # Control buttons frame
         control_frame = ttk.LabelFrame(main_frame, text="Solver Control", padding="10")
         control_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 20))
         
@@ -121,7 +121,7 @@ class GoogleMinesweeperGUI:
             # Initialize detector first
             self.detector.set_difficulty(difficulty)
             
-            # Then set controller difficulty (which can now use the initialized detector)
+            # Then set controller difficulty
             self.controller.set_difficulty(difficulty)
             
             # Initialize solver with board dimensions and difficulty
@@ -168,16 +168,16 @@ class GoogleMinesweeperGUI:
                 # Reset state manager for new game
                 self.solver.reset_state()
                 
-                # Start a completely new game by clicking the smiley face
+                # Start a completely new game
                 self.controller.start_new_game()
-                time.sleep(0.5)  # Reduced wait for new game to start
+                time.sleep(0.5) 
                 
-                # Now make the initial center click to begin the game
+                # Make the initial center click to begin the game
                 self._update_status("Making initial center click...")
                 rows, cols = self.detector.get_board_dimensions()
                 center_row, center_col = rows // 2, cols // 2
                 self.controller.click_cell(center_row, center_col)
-                time.sleep(0.5)  # Reduced wait for board to update
+                time.sleep(0.5)
                 
                 # Re-capture board after initial click
                 self._update_status("Re-capturing board...")
@@ -191,14 +191,14 @@ class GoogleMinesweeperGUI:
             
             # Main solving loop
             move_count = 0
-            max_moves = 1000  # Safety limit
-            previous_board_states = []  # Track previous states to detect loops
-            max_state_history = 5  # Keep last 5 states
-            tab_focused_this_iteration = False  # Track if we've focused tab this iteration
+            max_moves = 1000 
+            previous_board_states = []  
+            max_state_history = 5 
+            tab_focused_this_iteration = False 
             
             
             while self.is_running and move_count < max_moves:
-                # Reset tab focus tracking for this iteration
+                # Reset tab focus tracking
                 tab_focused_this_iteration = False
                 
                 # Capture and analyze board
@@ -211,7 +211,6 @@ class GoogleMinesweeperGUI:
                 stats = self.solver.get_board_statistics(board_state)
                 
                 # Check for loops by comparing with previous states
-                # Use merged board state (includes internal flags) for loop detection
                 merged_board = self.solver.get_state_manager().merge_with_ocr_board(board_state)
                 board_state_key = tuple(sorted(merged_board.items()))
                 if board_state_key in previous_board_states:
@@ -242,7 +241,6 @@ class GoogleMinesweeperGUI:
                         
                         # Execute final moves
                         if final_mine_cells or final_safe_moves:
-                            # Check no-flag mode for final moves
                             final_flags_to_execute = final_mine_cells if not self.no_flag_mode.get() else []
                             
                             if final_mine_cells and final_safe_moves:
@@ -252,14 +250,13 @@ class GoogleMinesweeperGUI:
                             else:
                                 self._update_status(f"Executing final {len(final_safe_moves)} safe moves...")
                             
-                            # Update state manager for final moves (including flags for internal tracking)
-                            # Always update state manager for internal tracking, regardless of flag mode
+                            # Update state manager for final moves
                             for row, col in final_mine_cells:
                                 self.solver.flag_cell(row, col)
                             for row, col in final_safe_moves:
                                 self.solver.reveal_cell(row, col)
                             
-                            # Execute final moves - only safe moves if no-flag mode is on
+                            # Execute final moves
                             if final_safe_moves or final_flags_to_execute:
                                 focus_tab = not tab_focused_this_iteration
                                 self.controller.execute_batch_moves(final_safe_moves, final_flags_to_execute, focus_tab=focus_tab)
@@ -299,14 +296,13 @@ class GoogleMinesweeperGUI:
                                 break
                         else:
                             self._update_status("No certain moves found. Enable Probabilistic Mode to continue.")
-                            # Show messagebox to user
+
                             self.root.after(0, lambda: messagebox.showinfo("No Certain Moves", 
                                 "No certain moves found. Enable Probabilistic Mode to continue with best-guess moves."))
                             break
                 
                 # Execute moves efficiently using batch method
                 if mine_cells or safe_moves:
-                    # Check no-flag mode
                     flags_to_execute = mine_cells if not self.no_flag_mode.get() else []
                     
                     if mine_cells and safe_moves:
@@ -316,19 +312,18 @@ class GoogleMinesweeperGUI:
                     else:
                         self._update_status(f"Found {len(safe_moves)} safe moves. Executing...")
                     
-                    # Update state manager for all moves (including flags for internal tracking)
-                    # Always update state manager for internal tracking, regardless of flag mode
+                    # Update state manager for all moves
                     for row, col in mine_cells:
                         self.solver.flag_cell(row, col)
                     for row, col in safe_moves:
                         self.solver.reveal_cell(row, col)
                     
-                    # Execute moves - only safe moves if no-flag mode is on
+                    # Execute moves
                     if safe_moves or flags_to_execute:
                         focus_tab = not tab_focused_this_iteration
                         self.controller.execute_batch_moves(safe_moves, flags_to_execute, focus_tab=focus_tab)
-                        tab_focused_this_iteration = True  # Mark that we've focused tab this iteration
-                        time.sleep(0.3)  # Reduced wait time after batch execution
+                        tab_focused_this_iteration = True  
+                        time.sleep(0.3)
                     
                     # Re-capture board after moves to ensure state is updated
                     self._update_status("Re-capturing board after moves...")
@@ -368,10 +363,10 @@ class GoogleMinesweeperGUI:
                 move_count += len(safe_moves) + len(flags_to_execute)
                 self._update_progress(min(20 + (move_count * 0.8), 95))
                 
-                # Reduced delay between moves for faster execution
+                # Delay between moves
                 time.sleep(0.1)
                 
-                # Check for win condition (no unopened cells left AND some revealed content)
+                # Check for win condition
                 stats = self.solver.get_board_statistics(board_state)
                 revealed_content = stats['revealed_numbers'] + stats['blank'] + stats['flagged']
                 
@@ -436,8 +431,6 @@ class GoogleMinesweeperGUI:
     
     def _update_status(self, message: str):
         """Internal method to update status from background thread."""
-        # This method is called from the game controller thread
-        # Use root.after to safely update GUI from background thread
         self.root.after(0, lambda: self.update_status(message))
     
     def update_progress(self, value: float):
