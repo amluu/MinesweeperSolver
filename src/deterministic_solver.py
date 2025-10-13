@@ -1,23 +1,23 @@
 from typing import Dict, List, Tuple, Set, Optional
+import configparser
+import os
 from .state_manager import MinesweeperStateManager
 from .csp_solver import MinesweeperCSPSolver
 
 class MinesweeperSolver:
     """Handles the minesweeper solving logic."""
     
-    # Google Minesweeper mine counts
-    MINE_COUNTS = {
-        'easy': 10,
-        'medium': 40, 
-        'hard': 99
-    }
-    
     def __init__(self, grid_rows: int, grid_cols: int, difficulty: str = 'medium'):
         """Initialize the solver with grid dimensions and difficulty."""
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
         self.difficulty = difficulty
-        self.max_mines = self.MINE_COUNTS.get(difficulty, 99)
+        
+        # Load mine count from config
+        config = configparser.ConfigParser()
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.ini')
+        config.read(config_path)
+        self.max_mines = config.getint(f'difficulty.{difficulty}', 'mine_count', fallback=99)
         
         # Initialize state manager for tracking flags and revealed cells
         self.state_manager = MinesweeperStateManager(grid_rows, grid_cols, difficulty)
