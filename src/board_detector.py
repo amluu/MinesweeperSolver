@@ -6,7 +6,7 @@ import mss
 import cv2
 
 class GoogleMinesweeperDetector:
-    """Board detector for Google Minesweeper using hardcoded coordinates."""
+    """Board detector for Google Minesweeper."""
     
     def __init__(self, config_path: str = "config.ini"):
         """Initialize the detector with configuration."""
@@ -89,7 +89,6 @@ class GoogleMinesweeperDetector:
                 cell_state = self._analyze_cell(cell_region)
                 board_state[(row, col)] = cell_state
         
-        
         return board_state
     
     def _analyze_cell(self, cell_region: np.ndarray) -> str:
@@ -98,64 +97,58 @@ class GoogleMinesweeperDetector:
             # Convert grayscale to RGB if needed
             cell_region = cv2.cvtColor(cell_region, cv2.COLOR_GRAY2RGB)
         
-        # Sample more of the cell (middle 80%) to better capture numbers
+        # Sample middle 80% of cell
         h, w = cell_region.shape[:2]
-        center_h = int(h * 0.1)  # Reduced from 0.2 to 0.1 (10% margin instead of 20%)
-        center_w = int(w * 0.1)  # Reduced from 0.2 to 0.1 (10% margin instead of 20%)
+        center_h = int(h * 0.1) 
+        center_w = int(w * 0.1) 
         center_region = cell_region[center_h:h-center_h, center_w:w-center_w]
         
         # Convert to HSV for better color detection
         hsv = cv2.cvtColor(center_region, cv2.COLOR_RGB2HSV)
         
-        # NOTE: Flag detection removed - flags are now tracked internally
-        
-        # Detect numbers 1-8 by their distinct colors (PRIORITY: check before blank cells)
+        # Detect numbers 1-8 by their distinct colors
         number = self._detect_number_by_color(hsv)
         if number is not None:
             return str(number)
         
-        # Check if cell is unopened (bright green) - check before blank
+        # Check if cell is unopened
         if self._is_unopened_cell(hsv):
             return 'unopened'
         
-        # Check if cell is revealed blank (beige/tan color) - check LAST
+        # Check if cell is revealed blank
         if self._is_blank_cell(hsv):
             return 'blank'
         
         # Default to unopened if uncertain
         return 'unopened'
     
-    # Flag detection methods removed - flags are now tracked internally
-    
     def _detect_number_by_color(self, hsv_region: np.ndarray) -> Optional[int]:
-        """Detect number 1-8 by their distinct colors in HSV."""
-        # Define color ranges based on actual RGB values from Google Minesweeper
-        # Convert RGB to HSV and add tolerance ranges
+        """Detect number 1-8 by their distinct colors in HSV."""        
         
+        # Color threshold ranges for numbers 1-8
         number_colors = {
-            1: ([105, 140, 150], [115, 255, 255]),  # Blue: RGB(56, 116, 203) -> HSV(212, 72, 80)
-            2: ([36, 108, 120], [76, 148, 160]),    # Green: RGB(80, 140, 70) -> HSV(56, 128, 140)
-            3: ([0, 161, 174], [22, 201, 214]),     # Red: RGB(194, 63, 56) -> HSV(2, 181, 194)
-            4: ([119, 171, 136], [159, 211, 176]),  # Purple: RGB(113, 39, 156) -> HSV(139, 191, 156)
-            5: ([0, 178, 220], [35, 218, 255]),     # Orange: RGB(240, 149, 54) -> HSV(15, 198, 240)
-            6: ([90, 150, 100], [110, 255, 220]),   # Cyan: RGB(0, 151, 167) -> HSV(184, 100, 65)
-            7: ([0, 0, 20], [180, 50, 100]),        # Dark gray: RGB(66, 66, 66) -> HSV(0, 0, 26)
-            8: ([0, 0, 80], [180, 80, 200])         # Light gray: RGB(156, 158, 159) -> HSV(0, 2, 62)
+            1: ([105, 140, 150], [115, 255, 255]),
+            2: ([36, 108, 120], [76, 148, 160]),   
+            3: ([0, 161, 174], [22, 201, 214]),    
+            4: ([119, 171, 136], [159, 211, 176]), 
+            5: ([0, 178, 220], [35, 218, 255]),    
+            6: ([90, 150, 100], [110, 255, 220]),  
+            7: ([0, 0, 20], [180, 50, 100]),       
+            8: ([0, 0, 80], [180, 80, 200])        
         }
         
         best_match = None
         best_count = 0
-        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.1  # 10% of pixels - more reasonable threshold
+        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.1 
         
         for number, (lower, upper) in number_colors.items():
-            # Create mask for this color range
+            # Create mask for color range
             lower = np.array(lower)
             upper = np.array(upper)
             mask = cv2.inRange(hsv_region, lower, upper)
             
-            # Count matching pixels
+            # Count matching pixels in mask
             count = cv2.countNonZero(mask)
-            
             
             if count > best_count and count > threshold:
                 best_count = count
@@ -165,31 +158,24 @@ class GoogleMinesweeperDetector:
     
     def _is_blank_cell(self, hsv_region: np.ndarray) -> bool:
         """Check if cell is revealed blank (beige/tan color)."""
-        # Blank cells: RGB(215, 184, 153) or RGB(229, 194, 159) -> HSV(25, 29, 84) or HSV(26, 31, 90)
-        # Beige/tan colors: low saturation, medium-high brightness
-        lower_beige = np.array([15, 20, 140])  # Light beige - wider range
-        upper_beige = np.array([35, 80, 255])  # Light tan - wider range
+        lower_beige = np.array([15, 20, 140])
+        upper_beige = np.array([35, 80, 255])
         
         mask = cv2.inRange(hsv_region, lower_beige, upper_beige)
         count = cv2.countNonZero(mask)
         
-        # Lower threshold since blank cells might be smaller portions
-        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.25
+        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.25 # higher threshold for blank cells
         return count > threshold
     
     def _is_unopened_cell(self, hsv_region: np.ndarray) -> bool:
         """Check if cell is unopened (bright green color)."""
-        # Unopened cells: RGB(170, 215, 80) or RGB(162, 209, 72) -> HSV(84, 63, 84) or HSV(86, 66, 82)
-        # Need to distinguish from number 2 which is darker green
-        lower_green = np.array([80, 150, 180])  # Bright green unopened cells
-        upper_green = np.array([90, 255, 255])  # Very bright green
+        lower_green = np.array([80, 150, 180]) 
+        upper_green = np.array([90, 255, 255]) 
         
         mask = cv2.inRange(hsv_region, lower_green, upper_green)
         count = cv2.countNonZero(mask)
         
-        # Need significant bright green pixels to be considered unopened
-        # Higher threshold to avoid confusion with number 2
-        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.4
+        threshold = hsv_region.shape[0] * hsv_region.shape[1] * 0.4 # higher threshold for unopened cells
         return count > threshold
     
     def get_board_dimensions(self) -> Tuple[int, int]:
@@ -207,7 +193,6 @@ class GoogleMinesweeperDetector:
         # Calculate cell center coordinates
         cell_x = int(self.board_config['x'] + (col * self.board_config['cell_width']) + (self.board_config['cell_width'] / 2))
         cell_y = int(self.board_config['y'] + (row * self.board_config['cell_height']) + (self.board_config['cell_height'] / 2))
-        
         
         return cell_x, cell_y
     
