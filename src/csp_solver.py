@@ -19,208 +19,326 @@ class MinesweeperCSPSolver:
         self.difficulty = difficulty
         self.max_mines = self.MINE_COUNTS.get(difficulty, 99)
         self.logger = logging.getLogger(__name__)
-        
-        self.logger.info(f"Initialized CSP solver for {grid_rows}x{grid_cols} board, {difficulty} difficulty, {self.max_mines} mines")
+        self.logger.info(
+            f"Initialized CSP solver for {grid_rows}x{grid_cols} board, {difficulty} difficulty, {self.max_mines} mines"
+        )
     
-    def find_certain_cells(self, board: Dict[Tuple[int, int], str], state_manager) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+    def find_certain_cells(
+        self,
+        board: Dict[Tuple[int, int], str],
+        state_manager
+    ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
         """
-        Find cells that are certain mines (1 in all solutions) or certain safe (0 in all solutions).
+        Find cells that are certain mines or certain safe using feasibility checks on a single model.
         Returns (certain_mines, certain_safe).
         """
-        # Get unopened cells
-        unopened_cells = self._get_unopened_cells(board, state_manager)
+        self.logger.info("=== CSP SOLVER DEBUG START ===")
         
-        if not unopened_cells:
-            self.logger.debug("No unopened cells found for CSP solving")
+        frontier_cells = self._get_frontier_cells(board, state_manager)
+        self.logger.info(f"DEBUG: Found {len(frontier_cells)} frontier cells")
+        if not frontier_cells:
             return [], []
-        
-        # Build constraint model
-        model, cell_vars = self._build_constraint_model(board, state_manager, unopened_cells)
-        
+        if len(frontier_cells) > 100:
+            self.logger.warning(f"DEBUG: Too many frontier cells ({len(frontier_cells)}), skipping CSP")
+            return [], []
+
+        model, cell_vars = self._build_constraint_model(board, state_manager, frontier_cells)
         if not model:
             self.logger.debug("Failed to build constraint model")
             return [], []
-        
-        # Find all solutions
-        solutions = self._find_all_solutions(model, cell_vars, unopened_cells)
-        
-        if not solutions:
-            self.logger.debug("No valid solutions found")
-            return [], []
-        
-        self.logger.info(f"Found {len(solutions)} valid solutions")
-        
-        # Analyze solutions to find certain cells
-        certain_mines = []
-        certain_safe = []
-        
-        for cell in unopened_cells:
-            cell_var = cell_vars[cell]
-            mine_count = sum(1 for solution in solutions if solution[cell_var])
+
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = 1.0
+
+        certain_mines: List[Tuple[int, int]] = []
+        certain_safe: List[Tuple[int, int]] = []
+
+        for cell in frontier_cells:
+            v = cell_vars[cell]
             
-            if mine_count == len(solutions):
-                # Cell is mine in ALL solutions
+            # Test if cell can be safe (not a mine)
+            model_copy = model.Clone()
+            model_copy.AddAssumption(v.Not())
+            safe_status = solver.Solve(model_copy)
+            
+            # Test if cell can be a mine
+            model_copy2 = model.Clone()
+            model_copy2.AddAssumption(v)
+            mine_status = solver.Solve(model_copy2)
+
+            self.logger.debug(f"DEBUG: Cell {cell} - Safe feasible: {safe_status}, Mine feasible: {mine_status}")
+
+            safe_feasible = safe_status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
+            mine_feasible = mine_status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
+
+            if not safe_feasible and mine_feasible:
                 certain_mines.append(cell)
-                self.logger.info(f"CSP: Cell {cell} is CERTAIN MINE (in {mine_count}/{len(solutions)} solutions)")
-            elif mine_count == 0:
-                # Cell is safe in ALL solutions
+                self.logger.info(f"CSP: Cell {cell} is CERTAIN MINE (cannot be safe)")
+            elif not mine_feasible and safe_feasible:
                 certain_safe.append(cell)
-                self.logger.info(f"CSP: Cell {cell} is CERTAIN SAFE (in 0/{len(solutions)} solutions)")
-        
-        self.logger.info(f"CSP found {len(certain_mines)} certain mines and {len(certain_safe)} certain safe cells")
+                self.logger.info(f"CSP: Cell {cell} is CERTAIN SAFE (cannot be mine)")
+            elif not safe_feasible and not mine_feasible:
+                self.logger.warning(f"DEBUG: Cell {cell} infeasible in both states (model inconsistency)")
+
+        if len(certain_mines) > 50 or len(certain_safe) > 50:
+            self.logger.warning(
+                f"DEBUG: Suspiciously many results: {len(certain_mines)} mines, {len(certain_safe)} safe. Returning empty for safety."
+            )
+            return [], []
+
+        self.logger.info(
+            f"DEBUG: CSP found {len(certain_mines)} certain mines and {len(certain_safe)} certain safe cells"
+        )
+        self.logger.info("=== CSP SOLVER DEBUG END ===")
         return certain_mines, certain_safe
     
-    def get_cell_probabilities(self, board: Dict[Tuple[int, int], str], state_manager) -> Dict[Tuple[int, int], float]:
+    def get_cell_probabilities(
+        self,
+        board: Dict[Tuple[int, int], str],
+        state_manager
+    ) -> Dict[Tuple[int, int], float]:
         """
-        Calculate the probability that each unopened cell contains a mine.
+        Calculate the probability that each frontier cell contains a mine using sampling.
         Returns dict mapping cell coordinates to mine probability (0.0 to 1.0).
+        Note: These are sampled probabilities, not exact probabilities.
         """
-        # Get unopened cells
-        unopened_cells = self._get_unopened_cells(board, state_manager)
-        
-        if not unopened_cells:
+        frontier_cells = self._get_frontier_cells(board, state_manager)
+        if not frontier_cells:
             return {}
         
-        # Build constraint model
-        model, cell_vars = self._build_constraint_model(board, state_manager, unopened_cells)
-        
+        model, cell_vars = self._build_constraint_model(board, state_manager, frontier_cells)
         if not model:
             return {}
         
-        # Find all solutions
-        solutions = self._find_all_solutions(model, cell_vars, unopened_cells)
-        
+        solutions = self._find_all_solutions(model, cell_vars, frontier_cells, max_solutions=100)
         if not solutions:
             return {}
         
-        # Calculate probabilities
-        probabilities = {}
-        for cell in unopened_cells:
-            cell_var = cell_vars[cell]
-            mine_count = sum(1 for solution in solutions if solution[cell_var])
-            probability = mine_count / len(solutions)
-            probabilities[cell] = probability
+        probabilities: Dict[Tuple[int, int], float] = {}
+        for cell in frontier_cells:
+            var = cell_vars[cell]
+            mine_count = sum(1 for sol in solutions if sol[var])
+            probabilities[cell] = mine_count / len(solutions)
         
-        self.logger.info(f"Calculated probabilities for {len(unopened_cells)} cells based on {len(solutions)} solutions")
+        self.logger.info(
+            f"Calculated SAMPLED probabilities for {len(frontier_cells)} frontier cells based on {len(solutions)} solution samples"
+        )
         return probabilities
     
-    def _get_unopened_cells(self, board: Dict[Tuple[int, int], str], state_manager) -> List[Tuple[int, int]]:
-        """Get all unopened cells that could potentially contain mines."""
-        unopened_cells = []
+    def _get_frontier_cells(
+        self,
+        board: Dict[Tuple[int, int], str],
+        state_manager
+    ) -> List[Tuple[int, int]]:
+        """Get frontier cells (unopened cells that have numbered neighbors)."""
+        frontier_cells: List[Tuple[int, int]] = []
+        flagged_count = 0
+        revealed_count = 0
+        ocr_revealed_count = 0
+        all_unopened_count = 0
         
         for row in range(self.grid_rows):
             for col in range(self.grid_cols):
                 cell = (row, col)
                 
-                # Skip if already flagged or revealed
-                if state_manager.is_flagged(row, col) or state_manager.is_revealed(row, col):
+                if state_manager.is_flagged(row, col):
+                    flagged_count += 1
+                    continue
+                if state_manager.is_revealed(row, col):
+                    revealed_count += 1
                     continue
                 
-                # Skip if OCR shows it's revealed
-                if cell in board and board[cell] in ['blank'] or (board.get(cell, '').isdigit()):
+                if cell in board and (board[cell] in ['blank'] or board.get(cell, '').isdigit()):
+                    ocr_revealed_count += 1
+                    continue
+                
+                all_unopened_count += 1
+                
+                neighbors = self._get_neighbors(row, col)
+                has_numbered_neighbor = any(
+                    neighbor in board and board[neighbor].isdigit()
+                    for neighbor in neighbors
+                )
+                if has_numbered_neighbor:
+                    frontier_cells.append(cell)
+        
+        self.logger.info(
+            f"DEBUG: Cell analysis - Total: {self.grid_rows * self.grid_cols}, "
+            f"Flagged: {flagged_count}, Revealed: {revealed_count}, OCR revealed: {ocr_revealed_count}, "
+            f"All unopened: {all_unopened_count}, Frontier: {len(frontier_cells)}"
+        )
+        return frontier_cells
+    
+    def _get_unopened_cells(
+        self,
+        board: Dict[Tuple[int, int], str],
+        state_manager
+    ) -> List[Tuple[int, int]]:
+        """Get all unopened cells that could potentially contain mines."""
+        unopened_cells: List[Tuple[int, int]] = []
+        flagged_count = 0
+        revealed_count = 0
+        ocr_revealed_count = 0
+        
+        for row in range(self.grid_rows):
+            for col in range(self.grid_cols):
+                cell = (row, col)
+                
+                if state_manager.is_flagged(row, col):
+                    flagged_count += 1
+                    continue
+                if state_manager.is_revealed(row, col):
+                    revealed_count += 1
+                    continue
+                
+                if cell in board and (board[cell] in ['blank'] or board.get(cell, '').isdigit()):
+                    ocr_revealed_count += 1
                     continue
                 
                 unopened_cells.append(cell)
         
+        self.logger.info(
+            f"DEBUG: Cell analysis - Total: {self.grid_rows * self.grid_cols}, Flagged: {flagged_count}, "
+            f"Revealed: {revealed_count}, OCR revealed: {ocr_revealed_count}, Unopened: {len(unopened_cells)}"
+        )
         return unopened_cells
     
-    def _build_constraint_model(self, board: Dict[Tuple[int, int], str], state_manager, unopened_cells: List[Tuple[int, int]]) -> Tuple[Optional[cp_model.CpModel], Optional[Dict]]:
-        """Build the constraint satisfaction model."""
+    def _build_constraint_model(
+        self,
+        board: Dict[Tuple[int, int], str],
+        state_manager,
+        unopened_cells: List[Tuple[int, int]]
+    ) -> Tuple[Optional[cp_model.CpModel], Optional[Dict]]:
+        """Build the constraint satisfaction model over a given set of unopened cells (usually the frontier)."""
         if not unopened_cells:
             return None, None
         
         model = cp_model.CpModel()
         
         # Create boolean variables for each unopened cell (1 = mine, 0 = safe)
-        cell_vars = {}
+        cell_vars: Dict[Tuple[int, int], cp_model.IntVar] = {}
         for cell in unopened_cells:
             cell_vars[cell] = model.NewBoolVar(f'cell_{cell[0]}_{cell[1]}')
         
-        # Add constraints for each numbered cell
         constraints_added = 0
+        
+        # Number constraints: sum(unopened_neighbor_vars) + flagged_neighbors == number
         for (row, col), content in board.items():
-            if content.isdigit():
+            if isinstance(content, str) and content.isdigit():
                 number = int(content)
                 neighbors = self._get_neighbors(row, col)
                 
-                # Find unopened neighbors that are in our variable set
-                unopened_neighbors = []
+                unopened_neighbor_vars: List[cp_model.IntVar] = []
                 flagged_neighbors = 0
                 
-                for neighbor in neighbors:
+                for nr, nc in neighbors:
+                    neighbor = (nr, nc)
                     if neighbor in cell_vars:
-                        unopened_neighbors.append(cell_vars[neighbor])
-                    elif state_manager.is_flagged(neighbor[0], neighbor[1]):
+                        unopened_neighbor_vars.append(cell_vars[neighbor])
+                    elif state_manager.is_flagged(nr, nc):
                         flagged_neighbors += 1
                 
-                # Add constraint: sum of unopened neighbor mines + flagged neighbors = cell number
-                if unopened_neighbors:
-                    model.Add(sum(unopened_neighbors) + flagged_neighbors == number)
+                if unopened_neighbor_vars:
+                    model.Add(sum(unopened_neighbor_vars) + flagged_neighbors == number)
                     constraints_added += 1
-                    self.logger.debug(f"Added constraint for cell ({row}, {col}): {len(unopened_neighbors)} unopened + {flagged_neighbors} flagged = {number}")
+                    self.logger.info(
+                        f"DEBUG: Added constraint for cell ({row}, {col}): "
+                        f"{len(unopened_neighbor_vars)} unopened + {flagged_neighbors} flagged = {number}"
+                    )
+                else:
+                    self.logger.debug(
+                        f"DEBUG: Cell ({row}, {col}) has no unopened neighbors in variable set, skipping constraint"
+                    )
         
-        # Add total mine count constraint
+        # Global mine count constraint
         total_flagged = len(state_manager.get_flagged_cells())
         remaining_mines = self.max_mines - total_flagged
+        all_unopened_cells = self._get_unopened_cells(board, state_manager)
         
-        if remaining_mines >= 0 and unopened_cells:
-            model.Add(sum(cell_vars.values()) == remaining_mines)
-            constraints_added += 1
-            self.logger.debug(f"Added total mine constraint: {remaining_mines} remaining mines")
+        self.logger.info(
+            f"DEBUG: Total flagged mines: {total_flagged}, Max mines: {self.max_mines}, Remaining: {remaining_mines}"
+        )
+        self.logger.info(
+            f"DEBUG: Frontier cells: {len(unopened_cells)}, All unopened cells: {len(all_unopened_cells)}"
+        )
         
         if constraints_added == 0:
             self.logger.debug("No constraints added - model not solvable")
             return None, None
         
-        self.logger.debug(f"Built constraint model with {constraints_added} constraints and {len(unopened_cells)} variables")
+        # If we're solving over ALL unopened cells, we can force exact remaining_mines.
+        if remaining_mines >= 0 and len(unopened_cells) == len(all_unopened_cells) and len(all_unopened_cells) > 0:
+            model.Add(sum(cell_vars.values()) == remaining_mines)
+            self.logger.info(f"DEBUG: Added exact total mine constraint: exactly {remaining_mines} remaining mines")
+        else:
+            # We're only solving a subset (e.g., frontier). Bound the total mines in this subset.
+            max_frontier_mines = max(0, min(len(unopened_cells), remaining_mines))
+            # Lower bound is 0 (implicit), but add explicit bounds for clarity
+            model.Add(sum(cell_vars.values()) >= 0)
+            model.Add(sum(cell_vars.values()) <= max_frontier_mines)
+            self.logger.info(
+                f"DEBUG: Added bounded total mine constraint on subset: 0 <= frontier_mines <= {max_frontier_mines}"
+            )
+        
+        self.logger.debug(
+            f"Built constraint model with {constraints_added} number constraints and {len(unopened_cells)} variables"
+        )
         return model, cell_vars
     
-    def _find_all_solutions(self, model: cp_model.CpModel, cell_vars: Dict, unopened_cells: List[Tuple[int, int]], max_solutions: int = 1000) -> List[Dict]:
-        """Find all valid solutions to the constraint model."""
+    def _find_all_solutions(
+        self,
+        model: cp_model.CpModel,
+        cell_vars: Dict[Tuple[int, int], cp_model.IntVar],
+        unopened_cells: List[Tuple[int, int]],
+        max_solutions: int = 1000
+    ) -> List[Dict]:
+        """Find up to max_solutions valid solutions to the constraint model."""
         solver = cp_model.CpSolver()
-        
-        # Set solver parameters for better performance
         solver.parameters.enumerate_all_solutions = True
-        solver.parameters.max_time_in_seconds = 5.0  # 5 second timeout
+        solver.parameters.max_time_in_seconds = 5.0  # time cap
         
-        solutions = []
+        solutions: List[Dict] = []
         
         class SolutionCollector(cp_model.CpSolverSolutionCallback):
-            def __init__(self, variables):
+            def __init__(self, variables_dict):
                 cp_model.CpSolverSolutionCallback.__init__(self)
-                self.variables = variables
-                self.solutions = []
+                self.variables_dict = variables_dict
+                self.solutions: List[Dict] = []
             
             def on_solution_callback(self):
-                # Store the solution
-                solution = {}
-                for cell, var in self.variables.items():
-                    solution[var] = self.Value(var)
-                self.solutions.append(solution)
-                
-                # Limit number of solutions to prevent memory issues
+                sol = {}
+                for _, var in self.variables_dict.items():
+                    sol[var] = self.Value(var)
+                self.solutions.append(sol)
                 if len(self.solutions) >= max_solutions:
                     self.StopSearch()
         
         collector = SolutionCollector(cell_vars)
         status = solver.SolveWithSolutionCallback(model, collector)
         
-        if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
+        self.logger.info(f"DEBUG: Solver status: {status}")
+        
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             solutions = collector.solutions
-            self.logger.debug(f"Found {len(solutions)} solutions in {solver.WallTime():.2f} seconds")
+            self.logger.info(f"DEBUG: Found {len(solutions)} solutions in {solver.WallTime():.2f} seconds")
+            if solutions:
+                first_solution = solutions[0]
+                sample = list(first_solution.items())[:5]
+                for var, value in sample:
+                    self.logger.info(f"DEBUG: {var} = {value}")
         else:
-            self.logger.debug(f"Solver status: {status}")
+            self.logger.warning(f"DEBUG: Solver failed with status: {status}")
         
         return solutions
     
     def _get_neighbors(self, row: int, col: int) -> List[Tuple[int, int]]:
         """Get all valid neighbors for a given cell."""
-        neighbors = []
+        neighbors: List[Tuple[int, int]] = []
         for dr in [-1, 0, 1]:
             for dc in [-1, 0, 1]:
                 if (dr, dc) != (0, 0):
                     nr, nc = row + dr, col + dc
-                    if (0 <= nr < self.grid_rows and 0 <= nc < self.grid_cols):
+                    if 0 <= nr < self.grid_rows and 0 <= nc < self.grid_cols:
                         neighbors.append((nr, nc))
         return neighbors
     

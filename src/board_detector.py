@@ -240,9 +240,9 @@ class GoogleMinesweeperDetector:
         cell_y = int(self.board_config['y'] + (row * self.board_config['cell_height']) + (self.board_config['cell_height'] / 2))
         
         # Debug logging
-        self.logger.info(f"Cell ({row}, {col}) coordinates: board at ({self.board_config['x']}, {self.board_config['y']}), "
-                        f"cell size {self.board_config['cell_width']}x{self.board_config['cell_height']}, "
-                        f"final coords ({cell_x}, {cell_y})")
+        # self.logger.info(f"Cell ({row}, {col}) coordinates: board at ({self.board_config['x']}, {self.board_config['y']}), "
+        #                 f"cell size {self.board_config['cell_width']}x{self.board_config['cell_height']}, "
+        #                 f"final coords ({cell_x}, {cell_y})")
         
         return cell_x, cell_y
     

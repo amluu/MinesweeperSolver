@@ -115,13 +115,16 @@ class MinesweeperSolver:
                 # If all unopened neighbors must be mines
                 if len(unopened_neighbors) + flagged_neighbors == number:
                     for unopened in unopened_neighbors:
-                        # Double-check: ensure not already flagged AND not already in our set
+                        # Triple-check: ensure not flagged, not revealed, and not already in our set
                         if (not self.state_manager.is_flagged(unopened[0], unopened[1]) and 
+                            not self.state_manager.is_revealed(unopened[0], unopened[1]) and
                             unopened not in mine_cells):
                             mine_cells.add(unopened)
                             self.logger.info(f"Identified mine at ({unopened[0]}, {unopened[1]}) based on cell ({row}, {col}) with number {number}")
                         elif self.state_manager.is_flagged(unopened[0], unopened[1]):
                             self.logger.debug(f"Cell ({unopened[0]}, {unopened[1]}) already flagged, skipping")
+                        elif self.state_manager.is_revealed(unopened[0], unopened[1]):
+                            self.logger.debug(f"Cell ({unopened[0]}, {unopened[1]}) already revealed, skipping")
         
         self.logger.info(f"Total mines identified: {len(mine_cells)}")
         if mine_cells:
@@ -153,14 +156,17 @@ class MinesweeperSolver:
                 if flagged_neighbors == number:
                     for neighbor in unopened_neighbors:
                         current_state = board.get(neighbor)
-                        # Ensure it's truly unopened and not flagged in our state manager
+                        # Ensure it's truly unopened, not flagged, and not revealed
                         if (current_state == 'unopened' and 
                             not self.state_manager.is_flagged(neighbor[0], neighbor[1]) and
+                            not self.state_manager.is_revealed(neighbor[0], neighbor[1]) and
                             neighbor not in safe_moves):
                             safe_moves.add(neighbor)
                             self.logger.info(f"Identified safe move at ({neighbor[0]}, {neighbor[1]}) - all mines flagged for cell ({row}, {col}) with number {number}")
                         elif self.state_manager.is_flagged(neighbor[0], neighbor[1]):
                             self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already flagged, skipping safe move")
+                        elif self.state_manager.is_revealed(neighbor[0], neighbor[1]):
+                            self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already revealed, skipping safe move")
         
         # Second pass: Find safe moves using constraint satisfaction
         # Look for cells where we can determine safety through elimination
@@ -182,14 +188,17 @@ class MinesweeperSolver:
                     # All unopened neighbors must be safe
                     for neighbor in unopened_neighbors:
                         current_state = board.get(neighbor)
-                        # Ensure it's truly unopened and not flagged in our state manager
+                        # Ensure it's truly unopened, not flagged, and not revealed
                         if (current_state == 'unopened' and 
                             not self.state_manager.is_flagged(neighbor[0], neighbor[1]) and
+                            not self.state_manager.is_revealed(neighbor[0], neighbor[1]) and
                             neighbor not in safe_moves):
                             safe_moves.add(neighbor)
                             self.logger.info(f"Identified safe move at ({neighbor[0]}, {neighbor[1]}) - no mines needed for cell ({row}, {col}) with number {number}")
                         elif self.state_manager.is_flagged(neighbor[0], neighbor[1]):
                             self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already flagged, skipping safe move")
+                        elif self.state_manager.is_revealed(neighbor[0], neighbor[1]):
+                            self.logger.debug(f"Cell ({neighbor[0]}, {neighbor[1]}) already revealed, skipping safe move")
         
         self.logger.info(f"Total safe moves identified: {len(safe_moves)}")
         if safe_moves:
@@ -329,7 +338,7 @@ class MinesweeperSolver:
         return self.use_probabilistic
     
     def _get_all_unopened_cells(self, board: Dict[Tuple[int, int], str]) -> List[Tuple[int, int]]:
-        """Get all unopened cells that are not flagged."""
+        """Get all unopened cells that are not flagged or revealed."""
         unopened_cells = []
         
         for row in range(self.grid_rows):
@@ -340,7 +349,7 @@ class MinesweeperSolver:
                 if self.state_manager.is_flagged(row, col) or self.state_manager.is_revealed(row, col):
                     continue
                 
-                # Skip if OCR shows it's revealed
+                # Skip if OCR shows it's revealed (numbers or blanks)
                 if cell in board and (board[cell] in ['blank'] or board.get(cell, '').isdigit()):
                     continue
                 
