@@ -13,8 +13,8 @@ class GoogleMinesweeperController:
         self.detector = None
         
         # Configure pyautogui for faster execution
-        pyautogui.FAILSAFE = True  # Move mouse to corner to stop
-        pyautogui.PAUSE = 0.01  # Minimal pause between actions for speed
+        pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0.01
         
     def set_detector(self, detector):
         """Set the board detector for coordinate calculation."""
@@ -34,7 +34,7 @@ class GoogleMinesweeperController:
         center_y = board_config['y'] + (board_config['height'] // 2)
         
         pyautogui.click(center_x, center_y)
-        time.sleep(0.1)  # Reduced wait for focus
+        time.sleep(0.1)
     
     def set_difficulty(self, difficulty: str):
         """Set the game difficulty - user must manually select difficulty."""
@@ -42,21 +42,19 @@ class GoogleMinesweeperController:
             raise ValueError(f"Invalid difficulty: {difficulty}")
         
         
-        # No longer clicking dropdown - user must select difficulty manually
-        # This ensures the first click is always the center click, not dropdown clicks
+        # The first click is always the center click
     
     def click_cell(self, row: int, col: int, button: str = 'left', focus_tab: bool = True):
         """Click a specific cell on the board."""
         if not self.detector:
             raise RuntimeError("Detector not set. Call set_detector() first.")
         
-        # Only focus tab if explicitly requested (for batching)
+        # Focus tab (for batching)
         if focus_tab:
             self.select_tab()
         
         # Get cell coordinates from detector
         x, y = self.detector.get_cell_coordinates(row, col)
-        
         
         # Get current screen size for validation
         screen_width, screen_height = pyautogui.size()
@@ -66,7 +64,7 @@ class GoogleMinesweeperController:
             return
         
         # Move mouse to coordinates quickly and click
-        pyautogui.moveTo(x, y, duration=0.1)  # Much faster movement
+        pyautogui.moveTo(x, y, duration=0.1)
         
         # Click the cell
         if button == 'left':
@@ -85,11 +83,11 @@ class GoogleMinesweeperController:
             return
             
         
-        # Focus tab only if requested (to avoid unnecessary mouse movement)
+        # Focus tab 
         if focus_tab:
             self.select_tab()
         
-        # Pre-calculate all coordinates to avoid redundant calculations
+        # Pre-calculate all coordinates
         mine_coords = []
         safe_coords = []
         
@@ -107,7 +105,7 @@ class GoogleMinesweeperController:
             except Exception:
                 pass
         
-        # Execute flagging first (mines) - direct coordinate clicks
+        # Execute flagging first
         for x, y in mine_coords:
             try:
                 pyautogui.moveTo(x, y, duration=0.05)
@@ -116,7 +114,7 @@ class GoogleMinesweeperController:
             except Exception:
                 pass
         
-        # Then execute safe moves - direct coordinate clicks
+        # Then execute safe moves
         for x, y in safe_coords:
             try:
                 pyautogui.moveTo(x, y, duration=0.05)
@@ -126,19 +124,18 @@ class GoogleMinesweeperController:
                 pass
     
     def start_new_game(self):
-        """Start a new game by clicking the smiley face."""
-        # The smiley face is typically at the top center of the board
+        """Start a new game."""
         if not self.detector:
             raise RuntimeError("Detector not set. Call set_detector() first.")
         
         # Focus the Minesweeper tab first
         self.select_tab()
         
-        # Calculate smiley face position (approximate)
+        # Click approximate middle
         board_config = self.detector.board_config
-        smiley_x = board_config['x'] + (board_config['width'] // 2)
-        smiley_y = board_config['y'] - 50  # Above the board
+        x = board_config['x'] + (board_config['width'] // 2)
+        y = board_config['y'] - 50
         
-        pyautogui.click(smiley_x, smiley_y)
-        time.sleep(0.5)  # Reduced wait for new game to start
+        pyautogui.click(x, y)
+        time.sleep(0.2)
     
