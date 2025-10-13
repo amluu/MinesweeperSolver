@@ -76,68 +76,7 @@ class GoogleMinesweeperController:
         else:
             raise ValueError(f"Invalid button: {button}. Use 'left' or 'right'.")
     
-    def click_safe_cells(self, safe_cells: List[Tuple[int, int]]):
-        """Click multiple safe cells efficiently."""
-        if not safe_cells:
-            return
-            
-        
-        # Focus tab only once at the beginning
-        self.select_tab()
-        
-        # Pre-calculate all coordinates
-        coords = []
-        for row, col in safe_cells:
-            try:
-                x, y = self.detector.get_cell_coordinates(row, col)
-                coords.append((x, y))
-            except Exception:
-                pass
-        
-        # Execute clicks with pre-calculated coordinates
-        for x, y in coords:
-            try:
-                pyautogui.moveTo(x, y, duration=0.05)
-                pyautogui.click(x, y)
-                time.sleep(0.03)
-            except Exception:
-                pass
     
-    def flag_mines(self, mine_cells: List[Tuple[int, int]]):
-        """Right-click to flag mine cells efficiently."""
-        if not mine_cells:
-            return
-            
-        
-        # Focus tab only once at the beginning
-        self.select_tab()
-        
-        # Pre-calculate all coordinates
-        coords = []
-        for row, col in mine_cells:
-            try:
-                x, y = self.detector.get_cell_coordinates(row, col)
-                coords.append((x, y))
-            except Exception:
-                pass
-        
-        # Execute right-clicks with pre-calculated coordinates
-        for x, y in coords:
-            try:
-                pyautogui.moveTo(x, y, duration=0.05)
-                pyautogui.rightClick(x, y)
-                time.sleep(0.03)
-            except Exception:
-                pass
-    
-    def make_move(self, row: int, col: int, action: str = 'reveal'):
-        """Make a move (reveal or flag) on a specific cell using double-click logic."""
-        if action == 'reveal':
-            self.click_cell(row, col, 'left')
-        elif action == 'flag':
-            self.click_cell(row, col, 'right')
-        else:
-            raise ValueError(f"Invalid action: {action}. Use 'reveal' or 'flag'.")
     
     def execute_batch_moves(self, safe_moves: List[Tuple[int, int]], mine_cells: List[Tuple[int, int]], focus_tab: bool = True):
         """Execute both safe moves and flagging efficiently in one batch."""
@@ -203,20 +142,3 @@ class GoogleMinesweeperController:
         pyautogui.click(smiley_x, smiley_y)
         time.sleep(0.5)  # Reduced wait for new game to start
     
-    def get_mouse_position(self) -> Tuple[int, int]:
-        """Get current mouse position for debugging."""
-        return pyautogui.position()
-    
-    def move_mouse_to_cell(self, row: int, col: int):
-        """Move mouse to a specific cell without clicking."""
-        if not self.detector:
-            raise RuntimeError("Detector not set. Call set_detector() first.")
-        
-        x, y = self.detector.get_cell_coordinates(row, col)
-        pyautogui.moveTo(x, y)
-    
-    def test_coordinates(self):
-        """Test coordinate system by moving to known positions."""
-        if not self.detector:
-            raise RuntimeError("Detector not set. Call set_detector() first.")
-        

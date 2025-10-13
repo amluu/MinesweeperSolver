@@ -417,13 +417,6 @@ class GoogleMinesweeperGUI:
         """
         self.root.mainloop()
     
-    def show_error(self, message: str):
-        """Show an error message."""
-        messagebox.showerror("Error", message)
-    
-    def show_info(self, message: str):
-        """Show an info message."""
-        messagebox.showinfo("Info", message)
     
     def update_status(self, message: str):
         """Update the status label."""

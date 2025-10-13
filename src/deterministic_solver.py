@@ -154,7 +154,7 @@ class MinesweeperSolver:
                     # All unopened neighbors must be safe
                     for neighbor in unopened_neighbors:
                         current_state = board.get(neighbor)
-                        # Ensure it's truly unopened, not flagged, and not revealed
+                        # Ensure cell is unopened, not flagged, and not revealed
                         if (current_state == 'unopened' and 
                             not self.state_manager.is_flagged(neighbor[0], neighbor[1]) and
                             not self.state_manager.is_revealed(neighbor[0], neighbor[1]) and
@@ -162,26 +162,6 @@ class MinesweeperSolver:
                             safe_moves.add(neighbor)
         
         return list(safe_moves)
-    
-    def _flag_mines(self, board: Dict[Tuple[int, int], str]) -> None:
-        """
-        Flag cells that are definitely mines based on current information.
-        Modifies the board dictionary in place.
-        """
-        for (row, col), content in board.items():
-            if content.isdigit():
-                number = int(content)
-                
-                neighbors = self._get_neighbors(row, col)
-                unopened_neighbors = [(nr, nc) for (nr, nc) in neighbors 
-                                    if board.get((nr, nc)) == 'unopened']
-                flagged_neighbors = sum(1 for (nr, nc) in neighbors 
-                                      if board.get((nr, nc)) == 'flag')
-                
-                # If all unopened neighbors must be mines
-                if len(unopened_neighbors) + flagged_neighbors == number:
-                    for unopened in unopened_neighbors:
-                        board[unopened] = 'flag'
     
     def _get_neighbors(self, row: int, col: int) -> List[Tuple[int, int]]:
         """Get all valid neighbors for a given cell."""
@@ -194,10 +174,6 @@ class MinesweeperSolver:
                         neighbors.append((nr, nc))
         return neighbors
     
-    def has_guaranteed_moves(self, board: Dict[Tuple[int, int], str]) -> bool:
-        """Check if there are any guaranteed safe moves or mines to flag available."""
-        safe_moves, mine_cells = self.find_safe_moves(board)
-        return len(safe_moves) > 0 or len(mine_cells) > 0
     
     def get_board_statistics(self, board: Dict[Tuple[int, int], str]) -> Dict[str, int]:
         """Get statistics about the current board state using state manager data."""

@@ -41,14 +41,6 @@ class MinesweeperStateManager:
         self.moves_made.append((row, col, 'reveal'))
         return True
     
-    def unflag_cell(self, row: int, col: int) -> bool:
-        """Remove flag from a cell. Returns True if successful, False if not flagged."""
-        if (row, col) not in self.flagged_cells:
-            return False
-        
-        self.flagged_cells.remove((row, col))
-        self.moves_made.append((row, col, 'unflag'))
-        return True
     
     def is_flagged(self, row: int, col: int) -> bool:
         """Check if a cell is flagged."""
