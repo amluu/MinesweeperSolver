@@ -8,7 +8,7 @@ class MinesweeperSolver:
     """Handles the minesweeper solving logic."""
     
     def __init__(self, grid_rows: int, grid_cols: int, difficulty: str = 'medium'):
-        """Initialize the solver with grid dimensions and difficulty."""
+        """Initialize the solver with grid dimensions, difficulty, and mine count."""
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
         self.difficulty = difficulty

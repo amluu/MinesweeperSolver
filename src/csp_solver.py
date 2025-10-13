@@ -7,7 +7,7 @@ class MinesweeperCSPSolver:
     """Constraint solver for Minesweeper using OR-Tools CP-SAT."""
     
     def __init__(self, grid_rows: int, grid_cols: int, difficulty: str):
-        """Initialize the CSP solver with board dimensions and difficulty."""
+        """Initialize the CSP solver with board dimensions, difficulty, and mine count."""
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
         self.difficulty = difficulty
