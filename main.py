@@ -9,7 +9,6 @@ Optimized for Google Chrome at 110% zoom.
 
 import sys
 import os
-import logging
 from pathlib import Path
 
 # Add src directory to path
@@ -17,16 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.gui import UniversalMinesweeperGUI
 
-def setup_logging():
-    """Set up logging configuration."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('minesweeper_solver.log'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
 
 def check_dependencies():
     """Check if all required dependencies are available."""
@@ -70,10 +59,6 @@ def main():
         print("Please ensure all required files and directories are present.")
         sys.exit(1)
     
-    # Setup logging
-    setup_logging()
-    logger = logging.getLogger(__name__)
-    logger.info("Starting Minesweeper Solver")
     
     try:
         # Create and run GUI
@@ -82,14 +67,11 @@ def main():
         # Run the GUI (this will block until closed)
         gui.run()
         
-        logger.info("Application closed")
         
     except KeyboardInterrupt:
         print("\nApplication interrupted by user")
-        logger.info("Application interrupted by user")
     except Exception as e:
         print(f"Unexpected error: {e}")
-        logger.error(f"Unexpected error: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

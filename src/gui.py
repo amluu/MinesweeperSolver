@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
-import logging
 import time
 from typing import Optional, Callable
 try:
@@ -22,7 +21,6 @@ class UniversalMinesweeperGUI:
         self.solver_thread: Optional[threading.Thread] = None
         self.is_running = False
         
-        self.logger = logging.getLogger(__name__)
         
         # Initialize components
         self.detector = GoogleMinesweeperDetector()
@@ -48,13 +46,10 @@ class UniversalMinesweeperGUI:
             try:
                 keyboard.add_hotkey('esc', self._stop_solver)
                 self.global_hotkey_enabled = True
-                self.logger.info("Global ESC hotkey enabled")
             except Exception as e:
-                self.logger.warning(f"Could not set global ESC hotkey: {e}")
                 self.global_hotkey_enabled = False
         else:
             self.global_hotkey_enabled = False
-            self.logger.info("Keyboard module not available - using local ESC binding only")
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="20")
@@ -164,7 +159,6 @@ class UniversalMinesweeperGUI:
             
         except Exception as e:
             error_msg = f"Failed to initialize difficulty: {str(e)}"
-            self.logger.error(error_msg)
             messagebox.showerror("Error", error_msg)
             return
         
@@ -236,11 +230,9 @@ class UniversalMinesweeperGUI:
                 board_image = self.detector.capture_board()
                 board_state = self.detector.analyze_board(board_image)
                 
-                # PNG is now saved automatically with every OCR detection
                 
-                # Log detailed board statistics
+                # Get board statistics
                 stats = self.solver.get_board_statistics(board_state)
-                self.solver.log_board_statistics(stats, move_count + 1)
                 
                 # Check for loops by comparing with previous states
                 # Use merged board state (includes internal flags) for loop detection
@@ -248,7 +240,6 @@ class UniversalMinesweeperGUI:
                 board_state_key = tuple(sorted(merged_board.items()))
                 if board_state_key in previous_board_states:
                     self._update_status("Detected loop in board state. Stopping...")
-                    self.logger.warning("Loop detected in board state. Stopping solver...")
                     break
                 
                 # Update state history
@@ -437,7 +428,6 @@ class UniversalMinesweeperGUI:
                 
         except Exception as e:
             error_msg = f"Error running solver: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
             self._update_status("Error occurred")
             self._update_progress(0)
             self.root.after(0, lambda: messagebox.showerror("Error", error_msg))

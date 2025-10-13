@@ -1,4 +1,3 @@
-import logging
 from typing import Dict, Set, Tuple, Optional, List
 
 class MinesweeperStateManager:
@@ -9,7 +8,6 @@ class MinesweeperStateManager:
         self.rows = rows
         self.cols = cols
         self.difficulty = difficulty
-        self.logger = logging.getLogger(__name__)
         
         # Internal state tracking
         self.flagged_cells: Set[Tuple[int, int]] = set()
@@ -18,48 +16,38 @@ class MinesweeperStateManager:
         # Track moves made by the solver
         self.moves_made: List[Tuple[int, int, str]] = []  # (row, col, action)
         
-        
-        self.logger.info(f"Initialized state manager for {rows}x{cols} board, {difficulty} difficulty")
     
     def flag_cell(self, row: int, col: int) -> bool:
         """Flag a cell as a mine. Returns True if successful, False if already flagged."""
         if (row, col) in self.flagged_cells:
-            self.logger.warning(f"Attempted to flag already flagged cell ({row}, {col})")
             return False
         
         if (row, col) in self.revealed_cells:
-            self.logger.warning(f"Attempted to flag already revealed cell ({row}, {col})")
             return False
         
         self.flagged_cells.add((row, col))
         self.moves_made.append((row, col, 'flag'))
-        self.logger.info(f"Flagged cell ({row}, {col})")
         return True
     
     def reveal_cell(self, row: int, col: int) -> bool:
         """Mark a cell as revealed. Returns True if successful, False if already revealed."""
         if (row, col) in self.revealed_cells:
-            self.logger.warning(f"Attempted to reveal already revealed cell ({row}, {col})")
             return False
         
         if (row, col) in self.flagged_cells:
-            self.logger.warning(f"Attempted to reveal flagged cell ({row}, {col})")
             return False
         
         self.revealed_cells.add((row, col))
         self.moves_made.append((row, col, 'reveal'))
-        self.logger.info(f"Revealed cell ({row}, {col})")
         return True
     
     def unflag_cell(self, row: int, col: int) -> bool:
         """Remove flag from a cell. Returns True if successful, False if not flagged."""
         if (row, col) not in self.flagged_cells:
-            self.logger.warning(f"Attempted to unflag non-flagged cell ({row}, {col})")
             return False
         
         self.flagged_cells.remove((row, col))
         self.moves_made.append((row, col, 'unflag'))
-        self.logger.info(f"Unflagged cell ({row}, {col})")
         return True
     
     def is_flagged(self, row: int, col: int) -> bool:
@@ -109,9 +97,6 @@ class MinesweeperStateManager:
                 # Even if OCR sees a number where we have a flag, we keep the flag
                 if self.is_flagged(row, col):
                     merged_board[cell_pos] = 'flag'
-                    # Only log this occasionally to avoid spam
-                    if row < 5 and col < 5:  # Only log first few cells to avoid spam
-                        self.logger.debug(f"Cell ({row}, {col}): Using internal flag state, ignoring OCR: {ocr_board.get(cell_pos, 'none')}")
                     continue
                 
                 # Use OCR for revealed content (numbers, blanks) only for non-flagged cells
@@ -156,23 +141,13 @@ class MinesweeperStateManager:
         self.flagged_cells.clear()
         self.revealed_cells.clear()
         self.moves_made.clear()
-        self.logger.info("State manager reset for new game")
     
     def set_difficulty(self, difficulty: str):
         """Update the difficulty level."""
         if difficulty not in ['easy', 'medium', 'hard']:
             raise ValueError(f"Invalid difficulty: {difficulty}")
         self.difficulty = difficulty
-        self.logger.info(f"Difficulty updated to {difficulty}")
     
-    def log_state(self):
-        """Log the current state for debugging."""
-        stats = self.get_board_statistics()
-        self.logger.info(f"State Manager - Flagged: {stats['flagged']}, Revealed: {stats['revealed']}, Unopened: {stats['unopened']}")
-        
-        if self.flagged_cells:
-            flagged_list = sorted(list(self.flagged_cells))
-            self.logger.debug(f"Flagged cells: {flagged_list}")
     
     def validate_board_state(self, ocr_board: Dict[Tuple[int, int], str]) -> bool:
         """
@@ -198,9 +173,6 @@ class MinesweeperStateManager:
                             conflicts.append(f"Cell ({row}, {col}): Internal=revealed, OCR=unopened")
         
         if conflicts:
-            self.logger.warning(f"Found {len(conflicts)} state conflicts:")
-            for conflict in conflicts:
-                self.logger.warning(f"  {conflict}")
             return False
         
         return True

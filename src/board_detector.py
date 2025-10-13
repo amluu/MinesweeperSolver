@@ -1,11 +1,9 @@
-import logging
 import configparser
 from typing import Dict, Tuple, Optional
 import numpy as np
 from PIL import Image
 import mss
 import cv2
-import time
 
 class GoogleMinesweeperDetector:
     """Board detector for Google Minesweeper using hardcoded coordinates."""
@@ -14,7 +12,6 @@ class GoogleMinesweeperDetector:
         """Initialize the detector with configuration."""
         self.config = configparser.ConfigParser()
         self.config.read(config_path)
-        self.logger = logging.getLogger(__name__)
         self.current_difficulty = None
         self.board_config = None
         self.sct = mss.mss()
@@ -42,7 +39,6 @@ class GoogleMinesweeperDetector:
             'cell_height': self.config.getfloat(section_name, 'cell_height')
         }
         
-        self.logger.info(f"Set difficulty to {difficulty}: {self.board_config['rows']}x{self.board_config['cols']} grid")
     
     def capture_board(self) -> Image.Image:
         """Capture the game board screenshot."""
@@ -63,7 +59,6 @@ class GoogleMinesweeperDetector:
         # Convert to PIL Image
         img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
         
-        self.logger.debug(f"Captured board: {img.size}")
         return img
     
     def analyze_board(self, image: Image.Image) -> Dict[Tuple[int, int], str]:
@@ -94,29 +89,6 @@ class GoogleMinesweeperDetector:
                 cell_state = self._analyze_cell(cell_region)
                 board_state[(row, col)] = cell_state
         
-        # Save PNG with unique timestamp for debugging
-        timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
-        debug_filename = f"ocr_board_{timestamp}.png"
-        self.save_debug_image(image, debug_filename)
-        
-        # Debug: Print the board state as a grid
-        self.logger.info("=== OCR DETECTED BOARD STATE ===")
-        for row in range(self.board_config['rows']):
-            row_str = ""
-            for col in range(self.board_config['cols']):
-                state = board_state.get((row, col), '?')
-                if state == 'unopened':
-                    row_str += "U "
-                elif state == 'blank':
-                    row_str += "B "
-                elif state == 'flag':
-                    row_str += "F "
-                elif state.isdigit():
-                    row_str += f"{state} "
-                else:
-                    row_str += "? "
-            self.logger.info(f"Row {row:2d}: {row_str}")
-        self.logger.info("=== END BOARD STATE ===")
         
         return board_state
     
@@ -184,9 +156,6 @@ class GoogleMinesweeperDetector:
             # Count matching pixels
             count = cv2.countNonZero(mask)
             
-            # Debug logging for numbers 2, 3, 4, and 5
-            if number in [2, 3, 4, 5]:  # Log all detection attempts for problematic numbers
-                self.logger.debug(f"Number {number}: {count} pixels (threshold: {threshold}) - {'MATCH' if count > threshold else 'below threshold'}")
             
             if count > best_count and count > threshold:
                 best_count = count
@@ -239,10 +208,6 @@ class GoogleMinesweeperDetector:
         cell_x = int(self.board_config['x'] + (col * self.board_config['cell_width']) + (self.board_config['cell_width'] / 2))
         cell_y = int(self.board_config['y'] + (row * self.board_config['cell_height']) + (self.board_config['cell_height'] / 2))
         
-        # Debug logging
-        # self.logger.info(f"Cell ({row}, {col}) coordinates: board at ({self.board_config['x']}, {self.board_config['y']}), "
-        #                 f"cell size {self.board_config['cell_width']}x{self.board_config['cell_height']}, "
-        #                 f"final coords ({cell_x}, {cell_y})")
         
         return cell_x, cell_y
     
@@ -251,10 +216,5 @@ class GoogleMinesweeperDetector:
         unopened_count = sum(1 for state in board_state.values() if state == 'unopened')
         total_cells = len(board_state)
         is_fresh = unopened_count == total_cells
-        self.logger.info(f"Board freshness check: {unopened_count}/{total_cells} unopened cells - {'FRESH' if is_fresh else 'IN_PROGRESS'}")
         return is_fresh
     
-    def save_debug_image(self, image: Image.Image, filename: str = "debug_board.png"):
-        """Save board image for debugging purposes."""
-        image.save(f"temp/{filename}")
-        self.logger.info(f"Saved debug image: temp/{filename}")

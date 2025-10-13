@@ -1,4 +1,3 @@
-import logging
 from typing import Dict, List, Tuple, Set, Optional
 from ortools.sat.python import cp_model
 
@@ -18,10 +17,6 @@ class MinesweeperCSPSolver:
         self.grid_cols = grid_cols
         self.difficulty = difficulty
         self.max_mines = self.MINE_COUNTS.get(difficulty, 99)
-        self.logger = logging.getLogger(__name__)
-        self.logger.info(
-            f"Initialized CSP solver for {grid_rows}x{grid_cols} board, {difficulty} difficulty, {self.max_mines} mines"
-        )
     
     def find_certain_cells(
         self,
@@ -32,19 +27,15 @@ class MinesweeperCSPSolver:
         Find cells that are certain mines or certain safe using feasibility checks on a single model.
         Returns (certain_mines, certain_safe).
         """
-        self.logger.info("=== CSP SOLVER DEBUG START ===")
         
         frontier_cells = self._get_frontier_cells(board, state_manager)
-        self.logger.info(f"DEBUG: Found {len(frontier_cells)} frontier cells")
         if not frontier_cells:
             return [], []
         if len(frontier_cells) > 100:
-            self.logger.warning(f"DEBUG: Too many frontier cells ({len(frontier_cells)}), skipping CSP")
             return [], []
 
         model, cell_vars = self._build_constraint_model(board, state_manager, frontier_cells)
         if not model:
-            self.logger.debug("Failed to build constraint model")
             return [], []
 
         solver = cp_model.CpSolver()
@@ -66,30 +57,19 @@ class MinesweeperCSPSolver:
             model_copy2.AddAssumption(v)
             mine_status = solver.Solve(model_copy2)
 
-            self.logger.debug(f"DEBUG: Cell {cell} - Safe feasible: {safe_status}, Mine feasible: {mine_status}")
 
             safe_feasible = safe_status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
             mine_feasible = mine_status in (cp_model.OPTIMAL, cp_model.FEASIBLE)
 
             if not safe_feasible and mine_feasible:
                 certain_mines.append(cell)
-                self.logger.info(f"CSP: Cell {cell} is CERTAIN MINE (cannot be safe)")
             elif not mine_feasible and safe_feasible:
                 certain_safe.append(cell)
-                self.logger.info(f"CSP: Cell {cell} is CERTAIN SAFE (cannot be mine)")
             elif not safe_feasible and not mine_feasible:
-                self.logger.warning(f"DEBUG: Cell {cell} infeasible in both states (model inconsistency)")
 
         if len(certain_mines) > 50 or len(certain_safe) > 50:
-            self.logger.warning(
-                f"DEBUG: Suspiciously many results: {len(certain_mines)} mines, {len(certain_safe)} safe. Returning empty for safety."
-            )
             return [], []
 
-        self.logger.info(
-            f"DEBUG: CSP found {len(certain_mines)} certain mines and {len(certain_safe)} certain safe cells"
-        )
-        self.logger.info("=== CSP SOLVER DEBUG END ===")
         return certain_mines, certain_safe
     
     def get_cell_probabilities(
@@ -120,9 +100,6 @@ class MinesweeperCSPSolver:
             mine_count = sum(1 for sol in solutions if sol[var])
             probabilities[cell] = mine_count / len(solutions)
         
-        self.logger.info(
-            f"Calculated SAMPLED probabilities for {len(frontier_cells)} frontier cells based on {len(solutions)} solution samples"
-        )
         return probabilities
     
     def _get_frontier_cells(
@@ -162,11 +139,6 @@ class MinesweeperCSPSolver:
                 if has_numbered_neighbor:
                     frontier_cells.append(cell)
         
-        self.logger.info(
-            f"DEBUG: Cell analysis - Total: {self.grid_rows * self.grid_cols}, "
-            f"Flagged: {flagged_count}, Revealed: {revealed_count}, OCR revealed: {ocr_revealed_count}, "
-            f"All unopened: {all_unopened_count}, Frontier: {len(frontier_cells)}"
-        )
         return frontier_cells
     
     def _get_unopened_cells(
@@ -197,10 +169,6 @@ class MinesweeperCSPSolver:
                 
                 unopened_cells.append(cell)
         
-        self.logger.info(
-            f"DEBUG: Cell analysis - Total: {self.grid_rows * self.grid_cols}, Flagged: {flagged_count}, "
-            f"Revealed: {revealed_count}, OCR revealed: {ocr_revealed_count}, Unopened: {len(unopened_cells)}"
-        )
         return unopened_cells
     
     def _build_constraint_model(
@@ -241,48 +209,27 @@ class MinesweeperCSPSolver:
                 if unopened_neighbor_vars:
                     model.Add(sum(unopened_neighbor_vars) + flagged_neighbors == number)
                     constraints_added += 1
-                    self.logger.info(
-                        f"DEBUG: Added constraint for cell ({row}, {col}): "
-                        f"{len(unopened_neighbor_vars)} unopened + {flagged_neighbors} flagged = {number}"
-                    )
                 else:
-                    self.logger.debug(
-                        f"DEBUG: Cell ({row}, {col}) has no unopened neighbors in variable set, skipping constraint"
-                    )
         
         # Global mine count constraint
         total_flagged = len(state_manager.get_flagged_cells())
         remaining_mines = self.max_mines - total_flagged
         all_unopened_cells = self._get_unopened_cells(board, state_manager)
         
-        self.logger.info(
-            f"DEBUG: Total flagged mines: {total_flagged}, Max mines: {self.max_mines}, Remaining: {remaining_mines}"
-        )
-        self.logger.info(
-            f"DEBUG: Frontier cells: {len(unopened_cells)}, All unopened cells: {len(all_unopened_cells)}"
-        )
         
         if constraints_added == 0:
-            self.logger.debug("No constraints added - model not solvable")
             return None, None
         
         # If we're solving over ALL unopened cells, we can force exact remaining_mines.
         if remaining_mines >= 0 and len(unopened_cells) == len(all_unopened_cells) and len(all_unopened_cells) > 0:
             model.Add(sum(cell_vars.values()) == remaining_mines)
-            self.logger.info(f"DEBUG: Added exact total mine constraint: exactly {remaining_mines} remaining mines")
         else:
             # We're only solving a subset (e.g., frontier). Bound the total mines in this subset.
             max_frontier_mines = max(0, min(len(unopened_cells), remaining_mines))
             # Lower bound is 0 (implicit), but add explicit bounds for clarity
             model.Add(sum(cell_vars.values()) >= 0)
             model.Add(sum(cell_vars.values()) <= max_frontier_mines)
-            self.logger.info(
-                f"DEBUG: Added bounded total mine constraint on subset: 0 <= frontier_mines <= {max_frontier_mines}"
-            )
         
-        self.logger.debug(
-            f"Built constraint model with {constraints_added} number constraints and {len(unopened_cells)} variables"
-        )
         return model, cell_vars
     
     def _find_all_solutions(
@@ -316,18 +263,10 @@ class MinesweeperCSPSolver:
         collector = SolutionCollector(cell_vars)
         status = solver.SolveWithSolutionCallback(model, collector)
         
-        self.logger.info(f"DEBUG: Solver status: {status}")
         
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             solutions = collector.solutions
-            self.logger.info(f"DEBUG: Found {len(solutions)} solutions in {solver.WallTime():.2f} seconds")
-            if solutions:
-                first_solution = solutions[0]
-                sample = list(first_solution.items())[:5]
-                for var, value in sample:
-                    self.logger.info(f"DEBUG: {var} = {value}")
         else:
-            self.logger.warning(f"DEBUG: Solver failed with status: {status}")
         
         return solutions
     
