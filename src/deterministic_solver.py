@@ -31,16 +31,15 @@ class MinesweeperSolver:
     def find_safe_moves(self, ocr_board: Dict[Tuple[int, int], str]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
         """
         Find safe moves and mine cells using three-tier approach:
-        1. Deterministic logic (existing)
+        1. Deterministic logic
         2. CSP solver for advanced deduction
         3. Flag count check for endgame
         Returns a tuple of (safe_moves, mine_cells_to_flag).
         """
-        # Merge OCR board with internal state (flags come from state manager)
+        # Merge OCR board with internal state
         merged_board = self.state_manager.merge_with_ocr_board(ocr_board)
         
-        
-        # Tier 1: Deterministic logic (existing)
+        # Tier 1: Deterministic logic
         mine_cells = self._identify_mines(merged_board)
         safe_moves = self._find_safe_moves_from_board(merged_board)
         
@@ -95,7 +94,6 @@ class MinesweeperSolver:
                 flagged_neighbors = sum(1 for (nr, nc) in neighbors 
                                       if self.state_manager.is_flagged(nr, nc))
                 
-                
                 # If all unopened neighbors must be mines
                 if len(unopened_neighbors) + flagged_neighbors == number:
                     for unopened in unopened_neighbors:
@@ -104,10 +102,6 @@ class MinesweeperSolver:
                             not self.state_manager.is_revealed(unopened[0], unopened[1]) and
                             unopened not in mine_cells):
                             mine_cells.add(unopened)
-                        elif self.state_manager.is_flagged(unopened[0], unopened[1]):
-                            pass
-                        elif self.state_manager.is_revealed(unopened[0], unopened[1]):
-                            pass
         
         return list(mine_cells)
     
@@ -133,16 +127,12 @@ class MinesweeperSolver:
                 if flagged_neighbors == number:
                     for neighbor in unopened_neighbors:
                         current_state = board.get(neighbor)
-                        # Ensure it's truly unopened, not flagged, and not revealed
+                        # Ensure cell is unopened, not flagged, and not revealed
                         if (current_state == 'unopened' and 
                             not self.state_manager.is_flagged(neighbor[0], neighbor[1]) and
                             not self.state_manager.is_revealed(neighbor[0], neighbor[1]) and
                             neighbor not in safe_moves):
                             safe_moves.add(neighbor)
-                        elif self.state_manager.is_flagged(neighbor[0], neighbor[1]):
-                            pass
-                        elif self.state_manager.is_revealed(neighbor[0], neighbor[1]):
-                            pass
         
         # Second pass: Find safe moves using constraint satisfaction
         # Look for cells where we can determine safety through elimination
@@ -170,10 +160,6 @@ class MinesweeperSolver:
                             not self.state_manager.is_revealed(neighbor[0], neighbor[1]) and
                             neighbor not in safe_moves):
                             safe_moves.add(neighbor)
-                        elif self.state_manager.is_flagged(neighbor[0], neighbor[1]):
-                            pass
-                        elif self.state_manager.is_revealed(neighbor[0], neighbor[1]):
-                            pass
         
         return list(safe_moves)
     
