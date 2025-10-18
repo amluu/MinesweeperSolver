@@ -2,6 +2,8 @@
 
 A Google Minesweeper Solver
 
+https://github.com/user-attachments/assets/45616ee0-c4b5-4a21-bd36-34629678cc1c
+
 ## Installation
 
 1. Install dependencies:
